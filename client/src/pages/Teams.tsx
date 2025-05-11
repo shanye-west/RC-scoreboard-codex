@@ -94,22 +94,22 @@ const Teams = () => {
         </div>
       ) : (
         <div>
-          {/* Team Selection Buttons */}
-          <div className="flex justify-center space-x-4 mb-8">
+          {/* Team Selection Headers */}
+          <div className="flex justify-between mb-8">
             {teams?.map((team: Team) => (
               <button
                 key={team.id}
                 onClick={() => setSelectedTeamId(team.id)}
-                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                className={`text-xl font-bold pb-2 border-b-2 transition-colors ${
                   selectedTeamId === team.id
                     ? team.id === 1 
-                      ? 'bg-aviator text-white' 
-                      : 'bg-producer text-white'
-                    : 'bg-gray-100 hover:bg-gray-200'
+                      ? 'text-aviator border-aviator' 
+                      : 'text-producer border-producer'
+                    : 'text-gray-400 border-gray-200 hover:text-gray-600'
                 }`}
               >
                 <div className="flex items-center">
-                  <div className={`w-3 h-3 rounded-full mr-2 ${team.id === 1 ? 'bg-white' : 'bg-white'}`}></div>
+                  <div className={`w-3 h-3 rounded-full mr-2 ${team.id === 1 ? 'bg-aviator' : 'bg-producer'}`}></div>
                   The {team.name}
                 </div>
               </button>
@@ -120,16 +120,6 @@ const Teams = () => {
           {teams?.map((team: Team) => (
             selectedTeamId === team.id && (
               <div key={team.id}>
-                <h2 
-                  className="font-heading text-xl font-bold mb-3 pb-2 border-b-2 flex items-center" 
-                  style={{ borderColor: team.colorCode }}
-                >
-                  <div className={`w-3 h-3 rounded-full mr-2 ${team.id === 1 ? 'bg-aviator' : 'bg-producer'}`}></div>
-                  <span className={team.id === 1 ? 'text-aviator' : 'text-producer'}>
-                    The {team.name}
-                  </span>
-                </h2>
-                
                 <div className="divide-y">
                   {playersByTeam?.[team.id]?.map((player: Player) => (
                     <div key={player.id} className="py-3 flex justify-between items-center">
