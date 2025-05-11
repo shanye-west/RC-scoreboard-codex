@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { useState } from "react";
+import aviatorsText from "../assets/aviators-text.svg";
+import producersText from "../assets/producers-text.svg";
 
 interface Player {
   id: number;
@@ -100,18 +102,19 @@ const Teams = () => {
               <button
                 key={team.id}
                 onClick={() => setSelectedTeamId(team.id)}
-                className={`text-xl font-bold pb-2 border-b-2 transition-colors ${
+                className={`pb-2 border-b-2 transition-colors ${
                   selectedTeamId === team.id
                     ? team.id === 1 
-                      ? 'text-aviator border-aviator' 
-                      : 'text-producer border-producer'
-                    : 'text-gray-400 border-gray-200 hover:text-gray-600'
+                      ? 'border-aviator' 
+                      : 'border-producer'
+                    : 'border-gray-200 opacity-50 hover:opacity-70'
                 }`}
               >
-                <div className="flex items-center">
-                  <div className={`w-3 h-3 rounded-full mr-2 ${team.id === 1 ? 'bg-aviator' : 'bg-producer'}`}></div>
-                  The {team.name}
-                </div>
+                <img 
+                  src={team.id === 1 ? aviatorsText : producersText} 
+                  alt={team.name}
+                  className="h-8"
+                />
               </button>
             ))}
           </div>
