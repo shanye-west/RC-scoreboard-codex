@@ -94,22 +94,22 @@ const Teams = () => {
       ) : (
         <div className="space-y-8">
           <div className="flex justify-between items-center border-b-2 border-gray-200 pb-4">
-            <h2 
-              className={`font-heading text-xl font-bold cursor-pointer transition-colors ${
-                activeTeam === 1 ? 'text-aviator' : 'text-aviator/30'
+            <div 
+              className={`cursor-pointer transition-opacity ${
+                activeTeam === 1 ? 'opacity-100' : 'opacity-30'
               }`}
               onClick={() => setActiveTeam(1)}
             >
-              The Aviators
-            </h2>
-            <h2 
-              className={`font-heading text-xl font-bold cursor-pointer transition-colors ${
-                activeTeam === 2 ? 'text-producer' : 'text-producer/30'
+              <img src="/aviators-text.svg" alt="The Aviators" className="h-8" />
+            </div>
+            <div 
+              className={`cursor-pointer transition-opacity ${
+                activeTeam === 2 ? 'opacity-100' : 'opacity-30'
               }`}
               onClick={() => setActiveTeam(2)}
             >
-              The Producers
-            </h2>
+              <img src="/producers-text.svg" alt="The Producers" className="h-8" />
+            </div>
           </div>
           
           <div className="divide-y">
@@ -117,9 +117,6 @@ const Teams = () => {
               <div key={player.id} className="py-3 flex justify-between items-center">
                 <span className="font-medium">{player.name}</span>
                 <div className="flex items-center space-x-3">
-                  <div className="text-sm text-muted-foreground">
-                    Record:
-                  </div>
                   <span className={`px-3 py-1 rounded-md text-white font-mono ${
                     player.wins > player.losses 
                       ? 'bg-green-600' 
