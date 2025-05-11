@@ -1,9 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
-import { useState } from "react";
-import aviatorsText from "../assets/aviators-text.svg";
-import producersText from "../assets/producers-text.svg";
 
 interface Player {
   id: number;
@@ -23,7 +20,6 @@ interface Team {
 
 const Teams = () => {
   const [_, navigate] = useLocation();
-  const [selectedTeamId, setSelectedTeamId] = useState<number>(1); // Default to Aviators
 
   // Fetch teams data
   const { data: teams, isLoading: isTeamsLoading } = useQuery<Team[]>({
@@ -93,64 +89,54 @@ const Teams = () => {
               ))}
             </div>
           </div>
+          
+          <div>
+            <Skeleton className="h-10 w-36 mb-3" />
+            <div className="space-y-2">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
-        <div>
-          {/* Team Selection Headers */}
-          <div className="flex justify-between mb-8">
-            {teams?.map((team: Team) => (
-              <button
-                key={team.id}
-                onClick={() => setSelectedTeamId(team.id)}
-                className={`pb-2 border-b-2 transition-colors ${
-                  selectedTeamId === team.id
-                    ? team.id === 1 
-                      ? 'border-aviator' 
-                      : 'border-producer'
-                    : 'border-gray-200 opacity-50 hover:opacity-70'
-                }`}
-              >
-                <img 
-                  src={team.id === 1 ? aviatorsText : producersText} 
-                  alt={team.name}
-                  className="h-8"
-                />
-              </button>
-            ))}
-          </div>
-
-          {/* Selected Team Roster */}
+        <div className="space-y-8">
           {teams?.map((team: Team) => (
-            selectedTeamId === team.id && (
-              <div key={team.id}>
-                <div className="divide-y">
-                  {playersByTeam?.[team.id]?.map((player: Player) => (
-                    <div key={player.id} className="py-3 flex justify-between items-center">
-                      <span className="font-medium">{player.name}</span>
-                      <div className="flex items-center space-x-3">
-                        <div className="text-sm text-muted-foreground">
-                          Record:
-                        </div>
-                        <span className={`px-3 py-1 rounded-md text-white font-mono ${
-                          player.wins > player.losses 
-                            ? 'bg-green-600' 
-                            : player.losses > player.wins 
-                              ? 'bg-red-600' 
-                              : 'bg-gray-500'
-                        }`}>
-                          {player.wins}-{player.losses}-{player.ties}
-                        </span>
-                        {player.wins + player.losses + player.ties > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            {((player.wins / (player.wins + player.losses + player.ties)) * 100).toFixed(0)}%
-                          </div>
-                        )}
+            <div key={team.id}>
+              <h2 
+                className="font-heading text-xl font-bold mb-3 pb-2 border-b-2" 
+                style={{ borderColor: team.colorCode }}
+              >
+                {team.name}
+              </h2>
+              
+              <div className="divide-y">
+                {playersByTeam?.[team.id]?.map((player: Player) => (
+                  <div key={player.id} className="py-3 flex justify-between items-center">
+                    <span className="font-medium">{player.name}</span>
+                    <div className="flex items-center space-x-3">
+                      <div className="text-sm text-muted-foreground">
+                        Record:
                       </div>
+                      <span className={`px-3 py-1 rounded-md text-white font-mono ${
+                        player.wins > player.losses 
+                          ? 'bg-green-600' 
+                          : player.losses > player.wins 
+                            ? 'bg-red-600' 
+                            : 'bg-gray-500'
+                      }`}>
+                        {player.wins}-{player.losses}-{player.ties}
+                      </span>
+                      {player.wins + player.losses + player.ties > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          {((player.wins / (player.wins + player.losses + player.ties)) * 100).toFixed(0)}%
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )
+            </div>
           ))}
         </div>
       )}
