@@ -420,3 +420,93 @@ export type InsertPlayerCareerStat = z.infer<
   typeof insertPlayerCareerStatSchema
 >;
 export type PlayerCareerStat = typeof player_career_stats.$inferSelect;
+
+// Player Matchups table - tracks head-to-head history between pairs of players
+export const player_matchups = pgTable(
+  "player_matchups",
+  {
+    id: serial("id").primaryKey(),
+    playerId1: integer("player_id_1").notNull(),
+    playerId2: integer("player_id_2").notNull(),
+    wins: integer("wins").default(0),
+    losses: integer("losses").default(0),
+    ties: integer("ties").default(0),
+    lastPlayed: timestamp("last_played", { mode: 'string' }).defaultNow(),
+  },
+  (table) => {
+    return {
+      playerId1Fk: foreignKey({
+        columns: [table.playerId1],
+        foreignColumns: [players.id],
+        name: "player_matchups_player_id_1_fk",
+      }),
+      playerId2Fk: foreignKey({
+        columns: [table.playerId2],
+        foreignColumns: [players.id],
+        name: "player_matchups_player_id_2_fk",
+      }),
+    };
+  },
+);
+export const insertPlayerMatchupSchema = createInsertSchema(player_matchups);
+export type InsertPlayerMatchup = z.infer<typeof insertPlayerMatchupSchema>;
+export type PlayerMatchup = typeof player_matchups.$inferSelect;
+
+// Player Match Type Stats table - tracks player performance in different match types
+export const player_match_type_stats = pgTable(
+  "player_match_type_stats",
+  {
+    id: serial("id").primaryKey(),
+    playerId: integer("player_id").notNull(),
+    matchType: text("match_type").notNull(),
+    wins: integer("wins").default(0),
+    losses: integer("losses").default(0),
+    ties: integer("ties").default(0),
+    lastUpdated: timestamp("last_updated", { mode: 'string' }).defaultNow(),
+  },
+  (table) => {
+    return {
+      playerIdFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: "player_match_type_stats_player_id_fk",
+      }),
+    };
+  },
+);
+export const insertPlayerMatchTypeStatSchema = createInsertSchema(player_match_type_stats);
+export type InsertPlayerMatchTypeStat = z.infer<typeof insertPlayerMatchTypeStatSchema>;
+export type PlayerMatchTypeStat = typeof player_match_type_stats.$inferSelect;
+
+// Bets table - for future sportsbook integration
+export const bets = pgTable(
+  "bets",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    matchId: integer("match_id").notNull(),
+    betType: text("bet_type").notNull(),
+    wagerAmount: numeric("wager_amount").notNull(),
+    outcome: text("outcome"),
+    payout: numeric("payout"),
+    created: timestamp("created", { mode: 'string' }).defaultNow(),
+    resolved: timestamp("resolved", { mode: 'string' }),
+  },
+  (table) => {
+    return {
+      userIdFk: foreignKey({
+        columns: [table.userId],
+        foreignColumns: [users.id],
+        name: "bets_user_id_fk",
+      }),
+      matchIdFk: foreignKey({
+        columns: [table.matchId],
+        foreignColumns: [matches.id],
+        name: "bets_match_id_fk",
+      }),
+    };
+  },
+);
+export const insertBetSchema = createInsertSchema(bets);
+export type InsertBet = z.infer<typeof insertBetSchema>;
+export type Bet = typeof bets.$inferSelect;

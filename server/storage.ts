@@ -1,7 +1,7 @@
 // server/storage.ts
 
 import { db } from "./db";
-import { eq, and, isNull, not, sql } from "drizzle-orm";
+import { eq, and, isNull, not, sql, or, desc } from "drizzle-orm";
 import {
   users,
   players,
@@ -17,6 +17,9 @@ import {
   tournament_player_stats,
   tournament_history,
   player_career_stats,
+  player_matchups,
+  player_match_type_stats,
+  bets,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -117,6 +120,16 @@ export interface IStorage {
   // Player career stats methods
   getPlayerCareerStats(playerId: number): Promise<any | undefined>;
   updatePlayerCareerStats(playerId: number, stats: any): Promise<any>;
+  
+  // Player matchup methods
+  getPlayerMatchup(playerId1: number, playerId2: number): Promise<any | undefined>;
+  updatePlayerMatchup(playerId1: number, playerId2: number, result: "win" | "loss" | "tie"): Promise<any>;
+  getPlayerMatchups(playerId: number): Promise<any[]>;
+  
+  // Player match type stats methods
+  getPlayerMatchTypeStats(playerId: number, matchType: string): Promise<any | undefined>;
+  updatePlayerMatchTypeStats(playerId: number, matchType: string, result: "win" | "loss" | "tie"): Promise<any>;
+  getPlayerAllMatchTypeStats(playerId: number): Promise<any[]>;
   
   // Stats calculations methods
   calculateAndUpdatePlayerStats(playerId: number, tournamentId: number): Promise<any>;
@@ -1178,6 +1191,156 @@ export class DBStorage implements IStorage {
         .returning();
       return row;
     }
+  }
+  
+  // Player matchup methods
+  async getPlayerMatchup(playerId1: number, playerId2: number) {
+    // Ensure smaller ID is always first to maintain consistency
+    const [smallerId, largerId] = playerId1 < playerId2 
+      ? [playerId1, playerId2] 
+      : [playerId2, playerId1];
+    
+    const [row] = await db
+      .select()
+      .from(player_matchups)
+      .where(
+        and(
+          eq(player_matchups.playerId1, smallerId),
+          eq(player_matchups.playerId2, largerId)
+        )
+      );
+    return row;
+  }
+
+  async updatePlayerMatchup(playerId1: number, playerId2: number, result: "win" | "loss" | "tie") {
+    // Ensure smaller ID is always first to maintain consistency
+    const [smallerId, largerId] = playerId1 < playerId2 
+      ? [playerId1, playerId2] 
+      : [playerId2, playerId1];
+    
+    // Need to adjust result if we swapped player order
+    let adjustedResult = result;
+    if (smallerId !== playerId1) {
+      // If we swapped the order, we need to invert the result
+      if (result === "win") adjustedResult = "loss";
+      else if (result === "loss") adjustedResult = "win";
+    }
+    
+    const existing = await this.getPlayerMatchup(smallerId, largerId);
+    
+    if (existing) {
+      // Update existing record
+      const updates: Record<string, any> = {
+        lastPlayed: new Date().toISOString()
+      };
+      
+      if (adjustedResult === "win") updates.wins = existing.wins + 1;
+      else if (adjustedResult === "loss") updates.losses = existing.losses + 1;
+      else updates.ties = existing.ties + 1;
+      
+      const [row] = await db.update(playerMatchups)
+        .set(updates)
+        .where(and(
+          eq(playerMatchups.playerId1, smallerId),
+          eq(playerMatchups.playerId2, largerId)
+        ))
+        .returning();
+      return row;
+    } else {
+      // Create new record
+      const data: Record<string, any> = {
+        playerId1: smallerId,
+        playerId2: largerId,
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        lastPlayed: new Date().toISOString()
+      };
+      
+      if (adjustedResult === "win") data.wins = 1;
+      else if (adjustedResult === "loss") data.losses = 1;
+      else data.ties = 1;
+      
+      const [row] = await db.insert(playerMatchups)
+        .values(data)
+        .returning();
+      return row;
+    }
+  }
+
+  async getPlayerMatchups(playerId: number) {
+    // Get matchups where player is either player1 or player2
+    return db.select()
+      .from(playerMatchups)
+      .where(or(
+        eq(playerMatchups.playerId1, playerId),
+        eq(playerMatchups.playerId2, playerId)
+      ))
+      .orderBy(desc(playerMatchups.lastPlayed));
+  }
+  
+  // Player match type stats methods
+  async getPlayerMatchTypeStats(playerId: number, matchType: string) {
+    const [row] = await db
+      .select()
+      .from(playerMatchTypeStats)
+      .where(
+        and(
+          eq(playerMatchTypeStats.playerId, playerId),
+          eq(playerMatchTypeStats.matchType, matchType)
+        )
+      );
+    return row;
+  }
+
+  async updatePlayerMatchTypeStats(playerId: number, matchType: string, result: "win" | "loss" | "tie") {
+    const existing = await this.getPlayerMatchTypeStats(playerId, matchType);
+    
+    if (existing) {
+      // Update existing stats
+      const updates: Record<string, any> = {
+        lastUpdated: new Date().toISOString()
+      };
+      
+      if (result === "win") updates.wins = existing.wins + 1;
+      else if (result === "loss") updates.losses = existing.losses + 1;
+      else updates.ties = existing.ties + 1;
+      
+      const [row] = await db.update(playerMatchTypeStats)
+        .set(updates)
+        .where(and(
+          eq(playerMatchTypeStats.playerId, playerId),
+          eq(playerMatchTypeStats.matchType, matchType)
+        ))
+        .returning();
+      return row;
+    } else {
+      // Create new stats
+      const data: Record<string, any> = {
+        playerId,
+        matchType,
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      if (result === "win") data.wins = 1;
+      else if (result === "loss") data.losses = 1;
+      else data.ties = 1;
+      
+      const [row] = await db.insert(playerMatchTypeStats)
+        .values(data)
+        .returning();
+      return row;
+    }
+  }
+
+  async getPlayerAllMatchTypeStats(playerId: number) {
+    return db.select()
+      .from(playerMatchTypeStats)
+      .where(eq(playerMatchTypeStats.playerId, playerId))
+      .orderBy(desc(playerMatchTypeStats.lastUpdated));
   }
   
   // Stats calculations methods
