@@ -100,14 +100,17 @@ const Teams = () => {
           </div>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="grid grid-cols-2 gap-8">
           {teams?.map((team: Team) => (
             <div key={team.id}>
               <h2 
-                className="font-heading text-xl font-bold mb-3 pb-2 border-b-2" 
+                className="font-heading text-xl font-bold mb-3 pb-2 border-b-2 flex items-center" 
                 style={{ borderColor: team.colorCode }}
               >
-                {team.name}
+                <div className={`w-3 h-3 rounded-full mr-2 ${team.id === 1 ? 'bg-aviator' : 'bg-producer'}`}></div>
+                <span className={team.id === 1 ? 'text-aviator' : 'text-producer'}>
+                  The {team.name}
+                </span>
               </h2>
               
               <div className="divide-y">
