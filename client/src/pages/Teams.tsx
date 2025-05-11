@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
+import { useState } from "react";
 
 interface Player {
   id: number;
@@ -20,6 +21,7 @@ interface Team {
 
 const Teams = () => {
   const [_, navigate] = useLocation();
+  const [selectedTeamId, setSelectedTeamId] = useState<number>(1); // Default to Aviators
 
   // Fetch teams data
   const { data: teams, isLoading: isTeamsLoading } = useQuery<Team[]>({
@@ -89,57 +91,73 @@ const Teams = () => {
               ))}
             </div>
           </div>
-          
-          <div>
-            <Skeleton className="h-10 w-36 mb-3" />
-            <div className="space-y-2">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-8">
-          {teams?.map((team: Team) => (
-            <div key={team.id}>
-              <h2 
-                className="font-heading text-xl font-bold mb-3 pb-2 border-b-2 flex items-center" 
-                style={{ borderColor: team.colorCode }}
+        <div>
+          {/* Team Selection Buttons */}
+          <div className="flex justify-center space-x-4 mb-8">
+            {teams?.map((team: Team) => (
+              <button
+                key={team.id}
+                onClick={() => setSelectedTeamId(team.id)}
+                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                  selectedTeamId === team.id
+                    ? team.id === 1 
+                      ? 'bg-aviator text-white' 
+                      : 'bg-producer text-white'
+                    : 'bg-gray-100 hover:bg-gray-200'
+                }`}
               >
-                <div className={`w-3 h-3 rounded-full mr-2 ${team.id === 1 ? 'bg-aviator' : 'bg-producer'}`}></div>
-                <span className={team.id === 1 ? 'text-aviator' : 'text-producer'}>
+                <div className="flex items-center">
+                  <div className={`w-3 h-3 rounded-full mr-2 ${team.id === 1 ? 'bg-white' : 'bg-white'}`}></div>
                   The {team.name}
-                </span>
-              </h2>
-              
-              <div className="divide-y">
-                {playersByTeam?.[team.id]?.map((player: Player) => (
-                  <div key={player.id} className="py-3 flex justify-between items-center">
-                    <span className="font-medium">{player.name}</span>
-                    <div className="flex items-center space-x-3">
-                      <div className="text-sm text-muted-foreground">
-                        Record:
-                      </div>
-                      <span className={`px-3 py-1 rounded-md text-white font-mono ${
-                        player.wins > player.losses 
-                          ? 'bg-green-600' 
-                          : player.losses > player.wins 
-                            ? 'bg-red-600' 
-                            : 'bg-gray-500'
-                      }`}>
-                        {player.wins}-{player.losses}-{player.ties}
-                      </span>
-                      {player.wins + player.losses + player.ties > 0 && (
-                        <div className="text-xs text-muted-foreground">
-                          {((player.wins / (player.wins + player.losses + player.ties)) * 100).toFixed(0)}%
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Selected Team Roster */}
+          {teams?.map((team: Team) => (
+            selectedTeamId === team.id && (
+              <div key={team.id}>
+                <h2 
+                  className="font-heading text-xl font-bold mb-3 pb-2 border-b-2 flex items-center" 
+                  style={{ borderColor: team.colorCode }}
+                >
+                  <div className={`w-3 h-3 rounded-full mr-2 ${team.id === 1 ? 'bg-aviator' : 'bg-producer'}`}></div>
+                  <span className={team.id === 1 ? 'text-aviator' : 'text-producer'}>
+                    The {team.name}
+                  </span>
+                </h2>
+                
+                <div className="divide-y">
+                  {playersByTeam?.[team.id]?.map((player: Player) => (
+                    <div key={player.id} className="py-3 flex justify-between items-center">
+                      <span className="font-medium">{player.name}</span>
+                      <div className="flex items-center space-x-3">
+                        <div className="text-sm text-muted-foreground">
+                          Record:
                         </div>
-                      )}
+                        <span className={`px-3 py-1 rounded-md text-white font-mono ${
+                          player.wins > player.losses 
+                            ? 'bg-green-600' 
+                            : player.losses > player.wins 
+                              ? 'bg-red-600' 
+                              : 'bg-gray-500'
+                        }`}>
+                          {player.wins}-{player.losses}-{player.ties}
+                        </span>
+                        {player.wins + player.losses + player.ties > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            {((player.wins / (player.wins + player.losses + player.ties)) * 100).toFixed(0)}%
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )
           ))}
         </div>
       )}
