@@ -923,6 +923,10 @@ export class DBStorage implements IStorage {
       // Get all participants in this match
       const participants = await this.getMatchParticipants(matchId);
       
+      // Get the match type for this match
+      const round = await this.getRound(match.roundId);
+      const matchType = round?.matchType || "unknown";
+      
       // Update each player's stats
       for (const participant of participants) {
         const player = await this.getPlayer(participant.playerId);
@@ -931,19 +935,43 @@ export class DBStorage implements IStorage {
           let losses = player.losses || 0;
           let ties = player.ties || 0;
           
+          let matchResult: "win" | "loss" | "tie" = "tie";
+          
           if (leadingTeam === participant.team) {
             // Player's team won
             wins++;
+            matchResult = "win";
           } else if (leadingTeam === null) {
             // Match was tied
             ties++;
+            matchResult = "tie";
           } else {
             // Player's team lost
             losses++;
+            matchResult = "loss";
           }
           
           // Update player stats
           await this.updatePlayer(player.id, { wins, losses, ties });
+          
+          // Update player match type stats
+          await this.updatePlayerMatchTypeStats(player.id, matchType, matchResult);
+          
+          // Update player matchups against all opponents
+          for (const opponent of participants) {
+            // Skip self
+            if (opponent.playerId === participant.playerId) continue;
+            
+            // Skip teammates
+            if (opponent.team === participant.team) continue;
+            
+            // Update matchup
+            await this.updatePlayerMatchup(
+              player.id, 
+              opponent.playerId, 
+              matchResult
+            );
+          }
         }
       }
     }
@@ -1312,18 +1340,14 @@ export class DBStorage implements IStorage {
       return row;
     } else {
       // Create new stats
-      const data: Record<string, any> = {
+      const data = {
         playerId,
         matchType,
-        wins: 0,
-        losses: 0,
-        ties: 0,
+        wins: result === "win" ? 1 : 0,
+        losses: result === "loss" ? 1 : 0,
+        ties: result === "tie" ? 1 : 0,
         lastUpdated: new Date().toISOString()
       };
-      
-      if (result === "win") data.wins = 1;
-      else if (result === "loss") data.losses = 1;
-      else data.ties = 1;
       
       const [row] = await db.insert(player_match_type_stats)
         .values(data)
@@ -1543,6 +1567,53 @@ export class DBStorage implements IStorage {
     
     // Ensure admin user exists
     await this.ensureAdminUserExists();
+    
+    // Create default database schema version record
+    await this.ensureSchemaVersionExists();
+  }
+  
+  // Track database schema version
+  async ensureSchemaVersionExists() {
+    try {
+      // Check if schema_version table exists (we'll create it directly with SQL since it's not in our model)
+      const schemaVersionExists = await db.execute(
+        `SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'schema_version'
+        )`
+      );
+      
+      if (!schemaVersionExists.rows[0].exists) {
+        // Create schema_version table
+        await db.execute(`
+          CREATE TABLE schema_version (
+            id SERIAL PRIMARY KEY,
+            version VARCHAR(20) NOT NULL,
+            applied_at TIMESTAMP DEFAULT NOW()
+          )
+        `);
+        
+        // Insert initial version
+        await db.execute(`
+          INSERT INTO schema_version (version) 
+          VALUES ('1.1.0')
+        `);
+        
+        console.log('Created schema_version table and set initial version to 1.1.0');
+      } else {
+        // Update to latest version if needed
+        await db.execute(`
+          INSERT INTO schema_version (version)
+          SELECT '1.1.0'
+          WHERE NOT EXISTS (
+            SELECT 1 FROM schema_version WHERE version = '1.1.0'
+          )
+        `);
+      }
+    } catch (error) {
+      console.error("Error ensuring schema version exists:", error);
+    }
   }
   
   // Ensures an admin user exists in the system
