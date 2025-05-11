@@ -106,12 +106,19 @@ export default function AdminMatchesPage() {
 
   const addMatchMutation = useMutation({
     mutationFn: async (matchData: any) => {
-      const res = await apiRequest("POST", "/api/matches", {
-        ...matchData,
-        roundId,
-        status: "upcoming",
-      });
-      return await res.json();
+      try {
+        const res = await apiRequest("POST", "/api/matches", {
+          ...matchData,
+          roundId,
+          status: "upcoming",
+        });
+        return await res.json();
+      } catch (error: any) {
+        if (error.message.includes("Player is already participating in a match in this round")) {
+          throw new Error("One or more selected players are already participating in another match in this round. Each player can only play in one match per round.");
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/matches?roundId=${roundId}`] });
