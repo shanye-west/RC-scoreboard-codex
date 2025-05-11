@@ -1147,7 +1147,7 @@ const EnhancedMatchScorecard = ({
                                 {getScoreInputValue(hole.number, "aviator") || ""}
                               </div>
                             ) : (
-                              canEditScores ? (
+                              canEditScores && !locked ? (
                                 <input
                                   type="tel"
                                   inputMode="numeric"
@@ -1167,7 +1167,7 @@ const EnhancedMatchScorecard = ({
                                   }
                                   min="1"
                                   max="12"
-                                  disabled={isHoleGreyedOut(hole.number) || locked}
+                                  disabled={isHoleGreyedOut(hole.number)}
                                 />
                               ) : (
                                 <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
@@ -1216,7 +1216,7 @@ const EnhancedMatchScorecard = ({
                                           {getScoreInputValue(hole.number, "aviator") || ""}
                                         </div>
                                       ) : (
-                                        canEditScores ? (
+                                        canEditScores && !locked ? (
                                           <input
                                             type="tel"
                                             inputMode="numeric"
@@ -1236,7 +1236,7 @@ const EnhancedMatchScorecard = ({
                                             }
                                             min="1"
                                             max="12"
-                                            disabled={isHoleGreyedOut(hole.number) || locked}
+                                            disabled={isHoleGreyedOut(hole.number)}
                                           />
                                         ) : (
                                           <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
@@ -1262,433 +1262,431 @@ const EnhancedMatchScorecard = ({
                               </td>
                               <td className="py-2 px-2 text-center font-semibold bg-gray-200">
                                 {playerTotals.get(player.name) || ""}
-                              </td>
-                            </tr>
-                          ))}
-                        </>
-                      )}
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
 
-                      {/* Team Aviators Row */}
-                      <tr className="border-b border-gray-200">
-                        <td className="py-2 px-2 font-semibold sticky-column bg-aviator text-white">
-                          <div>The Aviators</div>
-                        </td>
+                    {/* Team Aviators Row */}
+                    <tr className="border-b border-gray-200">
+                      <td className="py-2 px-2 font-semibold sticky-column bg-aviator text-white">
+                        <div>The Aviators</div>
+                      </td>
 
-                        {/* Front Nine Aviator Scores */}
-                        {frontNine.map((hole) => (
-                          <td key={hole.number} className="py-2 px-2 text-center">
-                            {isBestBall ? (
+                      {/* Front Nine Aviator Scores */}
+                      {frontNine.map((hole) => (
+                        <td key={hole.number} className="py-2 px-2 text-center">
+                          {isBestBall ? (
+                            <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                              getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
+                            }`}>
+                              {getScoreInputValue(hole.number, "aviator") || ""}
+                            </div>
+                          ) : (
+                            canEditScores && !locked ? (
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                  ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                    getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"}`}
+                                value={getScoreInputValue(hole.number, "aviator")}
+                                onChange={(e) =>
+                                  handleScoreChange(
+                                    hole.number,
+                                    "aviator",
+                                    e.target.value,
+                                    e.target
+                                  )
+                                }
+                                min="1"
+                                max="12"
+                                disabled={isHoleGreyedOut(hole.number)}
+                              />
+                            ) : (
                               <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                                 getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
                               }`}>
                                 {getScoreInputValue(hole.number, "aviator") || ""}
                               </div>
-                            ) : (
-                              canEditScores ? (
-                                <input
-                                  type="tel"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                    ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                      getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"}`}
-                                  value={getScoreInputValue(hole.number, "aviator")}
-                                  onChange={(e) =>
-                                    handleScoreChange(
-                                      hole.number,
-                                      "aviator",
-                                      e.target.value,
-                                      e.target
-                                    )
-                                  }
-                                  min="1"
-                                  max="12"
-                                  disabled={isHoleGreyedOut(hole.number) || locked}
-                                />
-                              ) : (
-                                <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                                  getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
-                                }`}>
-                                  {getScoreInputValue(hole.number, "aviator") || ""}
-                                </div>
-                              )
-                            )}
-                          </td>
-                        ))}
-                        <td className="py-2 px-2 text-center font-semibold bg-gray-100 text-aviator">
-                          {frontNineTotals.aviatorTotal > 0
-                            ? frontNineTotals.aviatorTotal
-                            : ""}
+                            )
+                          )}
                         </td>
+                      ))}
+                      <td className="py-2 px-2 text-center font-semibold bg-gray-100 text-aviator">
+                        {frontNineTotals.aviatorTotal > 0
+                          ? frontNineTotals.aviatorTotal
+                          : ""}
+                      </td>
 
-                        {/* Back Nine Aviator Scores */}
-                        {backNine.map((hole) => (
-                          <td key={hole.number} className="py-2 px-2 text-center">
-                            {isBestBall ? (
+                      {/* Back Nine Aviator Scores */}
+                      {backNine.map((hole) => (
+                        <td key={hole.number} className="py-2 px-2 text-center">
+                          {isBestBall ? (
+                            <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                              getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
+                            }`}>
+                              {getScoreInputValue(hole.number, "aviator") || ""}
+                            </div>
+                          ) : (
+                            canEditScores && !locked ? (
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                  ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                    getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"}`}
+                                value={getScoreInputValue(hole.number, "aviator")}
+                                onChange={(e) =>
+                                  handleScoreChange(
+                                    hole.number,
+                                    "aviator",
+                                    e.target.value,
+                                    e.target
+                                  )
+                                }
+                                min="1"
+                                max="12"
+                                disabled={isHoleGreyedOut(hole.number)}
+                              />
+                            ) : (
                               <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                                 getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
                               }`}>
                                 {getScoreInputValue(hole.number, "aviator") || ""}
                               </div>
-                            ) : (
-                              canEditScores ? (
-                                <input
-                                  type="tel"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                    ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                      getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"}`}
-                                  value={getScoreInputValue(hole.number, "aviator")}
-                                  onChange={(e) =>
-                                    handleScoreChange(
-                                      hole.number,
-                                      "aviator",
-                                      e.target.value,
-                                      e.target
-                                    )
-                                  }
-                                  min="1"
-                                  max="12"
-                                  disabled={isHoleGreyedOut(hole.number) || locked}
-                                />
-                              ) : (
-                                <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                                  getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
-                                }`}>
-                                  {getScoreInputValue(hole.number, "aviator") || ""}
-                                </div>
-                              )
-                            )}
-                          </td>
-                        ))}
-                        <td className="py-2 px-2 text-center font-semibold bg-gray-100 text-aviator">
-                          {backNineTotals.aviatorTotal > 0
-                            ? backNineTotals.aviatorTotal
-                            : ""}
+                            )
+                          )}
                         </td>
-                        <td className="py-2 px-2 text-center font-semibold bg-gray-200 text-aviator">
-                          {frontNineTotals.aviatorTotal + backNineTotals.aviatorTotal > 0
-                            ? frontNineTotals.aviatorTotal + backNineTotals.aviatorTotal
-                            : ""}
-                        </td>
-                      </tr>
+                      ))}
+                      <td className="py-2 px-2 text-center font-semibold bg-gray-100 text-aviator">
+                        {backNineTotals.aviatorTotal > 0
+                          ? backNineTotals.aviatorTotal
+                          : ""}
+                      </td>
+                      <td className="py-2 px-2 text-center font-semibold bg-gray-200 text-aviator">
+                        {frontNineTotals.aviatorTotal + backNineTotals.aviatorTotal > 0
+                          ? frontNineTotals.aviatorTotal + backNineTotals.aviatorTotal
+                          : ""}
+                      </td>
+                    </tr>
 
-                      {/* Match Status Row - Moved between teams */}
-                      <tr className="border-b border-gray-200">
-                        <td className="py-2 px-2 sticky-column bg-gray-100">
-                          <div className="text-sm font-bold">Match Status</div>
-                        </td>
-                        {/* Front Nine Match Status */}
-                        {frontNine.map((hole) => {
-                          const status = generateMatchStatus(hole.number);
-                          return (
-                            <td key={hole.number} className="py-2 px-2 text-center">
-                              <div className={`text-sm font-bold ${status.color}`}>
-                                {status.text}
-                              </div>
-                            </td>
-                          );
-                        })}
-                        <td className="py-2 px-2 text-center bg-gray-100"></td>
-                        {/* Back Nine Match Status */}
-                        {backNine.map((hole) => {
-                          const status = generateMatchStatus(hole.number);
-                          return (
-                            <td key={hole.number} className="py-2 px-2 text-center">
-                              <div className={`text-sm font-bold ${status.color}`}>
-                                {status.text}
-                              </div>
-                            </td>
-                          );
-                        })}
-                        <td className="py-2 px-2 text-center bg-gray-100"></td>
-                        <td className="py-2 px-2 text-center bg-gray-200"></td>
-                      </tr>
-
-                      {/* Team Producers Row */}
-                      <tr className="border-b border-gray-200">
-                        <td className="py-2 px-2 font-semibold sticky-column bg-producer text-white">
-                          <div>The Producers</div>
-                        </td>
-
-                        {/* Front Nine Producer Scores */}
-                        {frontNine.map((hole) => (
+                    {/* Match Status Row - Moved between teams */}
+                    <tr className="border-b border-gray-200">
+                      <td className="py-2 px-2 sticky-column bg-gray-100">
+                        <div className="text-sm font-bold">Match Status</div>
+                      </td>
+                      {/* Front Nine Match Status */}
+                      {frontNine.map((hole) => {
+                        const status = generateMatchStatus(hole.number);
+                        return (
                           <td key={hole.number} className="py-2 px-2 text-center">
-                            {isBestBall ? (
+                            <div className={`text-sm font-bold ${status.color}`}>
+                              {status.text}
+                            </div>
+                          </td>
+                        );
+                      })}
+                      <td className="py-2 px-2 text-center bg-gray-100"></td>
+                      {/* Back Nine Match Status */}
+                      {backNine.map((hole) => {
+                        const status = generateMatchStatus(hole.number);
+                        return (
+                          <td key={hole.number} className="py-2 px-2 text-center">
+                            <div className={`text-sm font-bold ${status.color}`}>
+                              {status.text}
+                            </div>
+                          </td>
+                        );
+                      })}
+                      <td className="py-2 px-2 text-center bg-gray-100"></td>
+                      <td className="py-2 px-2 text-center bg-gray-200"></td>
+                    </tr>
+
+                    {/* Team Producers Row */}
+                    <tr className="border-b border-gray-200">
+                      <td className="py-2 px-2 font-semibold sticky-column bg-producer text-white">
+                        <div>The Producers</div>
+                      </td>
+
+                      {/* Front Nine Producer Scores */}
+                      {frontNine.map((hole) => (
+                        <td key={hole.number} className="py-2 px-2 text-center">
+                          {isBestBall ? (
+                            <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                              getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                            }`}>
+                              {getScoreInputValue(hole.number, "producer") || ""}
+                            </div>
+                          ) : (
+                            canEditScores && !locked ? (
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                  ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                    getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
+                                value={getScoreInputValue(hole.number, "producer")}
+                                onChange={(e) =>
+                                  handleScoreChange(
+                                    hole.number,
+                                    "producer",
+                                    e.target.value,
+                                    e.target
+                                  )
+                                }
+                                min="1"
+                                max="12"
+                                disabled={isHoleGreyedOut(hole.number)}
+                              />
+                            ) : (
                               <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                                 getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
                               }`}>
                                 {getScoreInputValue(hole.number, "producer") || ""}
                               </div>
-                            ) : (
-                              canEditScores ? (
-                                <input
-                                  type="tel"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                    ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                      getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
-                                  value={getScoreInputValue(hole.number, "producer")}
-                                  onChange={(e) =>
-                                    handleScoreChange(
-                                      hole.number,
-                                      "producer",
-                                      e.target.value,
-                                      e.target
-                                    )
-                                  }
-                                  min="1"
-                                  max="12"
-                                  disabled={isHoleGreyedOut(hole.number) || locked}
-                                />
-                              ) : (
-                                <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                                  getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
-                                }`}>
-                                  {getScoreInputValue(hole.number, "producer") || ""}
-                                </div>
-                              )
-                            )}
-                          </td>
-                        ))}
-                        <td className="py-2 px-2 text-center font-semibold bg-gray-100 text-producer">
-                          {frontNineTotals.producerTotal > 0
-                            ? frontNineTotals.producerTotal
-                            : ""}
+                            )
+                          )}
                         </td>
+                      ))}
+                      <td className="py-2 px-2 text-center font-semibold bg-gray-100 text-producer">
+                        {frontNineTotals.producerTotal > 0
+                          ? frontNineTotals.producerTotal
+                          : ""}
+                      </td>
 
-                        {/* Back Nine Producer Scores */}
-                        {backNine.map((hole) => (
-                          <td key={hole.number} className="py-2 px-2 text-center">
-                            {isBestBall ? (
+                      {/* Back Nine Producer Scores */}
+                      {backNine.map((hole) => (
+                        <td key={hole.number} className="py-2 px-2 text-center">
+                          {isBestBall ? (
+                            <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                              getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                            }`}>
+                              {getScoreInputValue(hole.number, "producer") || ""}
+                            </div>
+                          ) : (
+                            canEditScores && !locked ? (
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                  ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                    getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
+                                value={getScoreInputValue(hole.number, "producer")}
+                                onChange={(e) =>
+                                  handleScoreChange(
+                                    hole.number,
+                                    "producer",
+                                    e.target.value,
+                                    e.target
+                                  )
+                                }
+                                min="1"
+                                max="12"
+                                disabled={isHoleGreyedOut(hole.number)}
+                              />
+                            ) : (
                               <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                                 getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
                               }`}>
                                 {getScoreInputValue(hole.number, "producer") || ""}
                               </div>
-                            ) : (
-                              canEditScores ? (
-                                <input
-                                  type="tel"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                    ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                      getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
-                                  value={getScoreInputValue(hole.number, "producer")}
-                                  onChange={(e) =>
-                                    handleScoreChange(
-                                      hole.number,
-                                      "producer",
-                                      e.target.value,
-                                      e.target
-                                    )
-                                  }
-                                  min="1"
-                                  max="12"
-                                  disabled={isHoleGreyedOut(hole.number) || locked}
-                                />
-                              ) : (
-                                <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                                  getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
-                                }`}>
-                                  {getScoreInputValue(hole.number, "producer") || ""}
-                                </div>
-                              )
-                            )}
-                          </td>
-                        ))}
-                        <td className="py-2 px-2 text-center font-semibold bg-gray-100 text-producer">
-                          {backNineTotals.producerTotal > 0
-                            ? backNineTotals.producerTotal
-                            : ""}
+                            )
+                          )}
                         </td>
-                        <td className="py-2 px-2 text-center font-semibold bg-gray-200 text-producer">
-                          {frontNineTotals.producerTotal + backNineTotals.producerTotal > 0
-                            ? frontNineTotals.producerTotal + backNineTotals.producerTotal
-                            : ""}
-                        </td>
-                      </tr>
+                      ))}
+                      <td className="py-2 px-2 text-center font-semibold bg-gray-100 text-producer">
+                        {backNineTotals.producerTotal > 0
+                          ? backNineTotals.producerTotal
+                          : ""}
+                      </td>
+                      <td className="py-2 px-2 text-center font-semibold bg-gray-200 text-producer">
+                        {frontNineTotals.producerTotal + backNineTotals.producerTotal > 0
+                          ? frontNineTotals.producerTotal + backNineTotals.producerTotal
+                          : ""}
+                      </td>
+                    </tr>
 
-                      {/* Producer Players Rows for Best Ball - displayed below team row */}
-                      {isBestBall && (
-                        <>
-                          {producerPlayersList.map((player: any) => (
-                            <tr key={player.id} className="border-b border-gray-200">
-                              <td className="py-2 px-2 sticky-column bg-white border-l-4 border-producer">
-                                <div className="flex justify-between items-center">
-                                  <div className="text-xs font-medium text-black leading-tight">
-                                    <div className="font-semibold">{player.name}</div>
-                                    <div className="text-blue-600">
-                                      HCP: {getPlayerCourseHandicap(player.id)}
-                                    </div>
+                    {/* Producer Players Rows for Best Ball - displayed below team row */}
+                    {isBestBall && (
+                      <>
+                        {producerPlayersList.map((player: any) => (
+                          <tr key={player.id} className="border-b border-gray-200">
+                            <td className="py-2 px-2 sticky-column bg-white border-l-4 border-producer">
+                              <div className="flex justify-between items-center">
+                                <div className="text-xs font-medium text-black leading-tight">
+                                  <div className="font-semibold">{player.name}</div>
+                                  <div className="text-blue-600">
+                                    HCP: {getPlayerCourseHandicap(player.id)}
                                   </div>
-                                  {canEditScores && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 p-1 ml-1 text-xs"
-                                      onClick={() => handleHandicapEdit(player.id, getPlayerCourseHandicap(player.id))}
-                                    >
-                                      Edit
-                                    </Button>
-                                  )}
                                 </div>
-                              </td>
-                              {/* Front Nine Producer Player Scores */}
-                              {frontNine.map((hole) => {
-                                const isLowest = isLowestScore(
-                                  hole.number,
-                                  player.name,
-                                  "producer",
-                                );
-                                return (
-                                  <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
-                                    <div className="relative">
-                                      {/* Handicap Strokes Indicators */}
-                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
-                                        <div className="handicap-strokes">
-                                          {Array.from({ length: playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0 }).map((_, i) => (
-                                            <div key={i} className="handicap-indicator"></div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {isBestBall ? (
+                                {canEditScores && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 p-1 ml-1 text-xs"
+                                    onClick={() => handleHandicapEdit(player.id, getPlayerCourseHandicap(player.id))}
+                                  >
+                                    Edit
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                            {/* Front Nine Producer Player Scores */}
+                            {frontNine.map((hole) => {
+                              const isLowest = isLowestScore(
+                                hole.number,
+                                player.name,
+                                "producer",
+                              );
+                              return (
+                                <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
+                                  <div className="relative">
+                                    {/* Handicap Strokes Indicators */}
+                                    {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                                      <div className="handicap-strokes">
+                                        {Array.from({ length: playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0 }).map((_, i) => (
+                                          <div key={i} className="handicap-indicator"></div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {isBestBall ? (
+                                      <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                        getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                                      }`}>
+                                        {getScoreInputValue(hole.number, "producer") || ""}
+                                      </div>
+                                    ) : (
+                                      canEditScores && !locked ? (
+                                        <input
+                                          type="tel"
+                                          inputMode="numeric"
+                                          pattern="[0-9]*"
+                                          data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
+                                          className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                            ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                              getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
+                                          value={getScoreInputValue(hole.number, "producer")}
+                                          onChange={(e) =>
+                                            handleScoreChange(
+                                              hole.number,
+                                              "producer",
+                                              e.target.value,
+                                              e.target
+                                            )
+                                          }
+                                          min="1"
+                                          max="12"
+                                          disabled={isHoleGreyedOut(hole.number)}
+                                        />
+                                      ) : (
                                         <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                                           getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
                                         }`}>
                                           {getScoreInputValue(hole.number, "producer") || ""}
                                         </div>
+                                      )
+                                    )}
+                                    {/* Net Score Display */}
+                                    {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
+                                     playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                                      <span className="net-score">
+                                        ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                            <td className="py-2 px-2 text-center font-semibold bg-gray-100">
+                              {playerFrontNineTotals.get(player.name) || ""}
+                            </td>
+                            {/* Back Nine Producer Player Scores */}
+                            {backNine.map((hole) => {
+                              const isLowest = isLowestScore(
+                                hole.number,
+                                player.name,
+                                "producer",
+                              );
+                              return (
+                                <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
+                                  <div className="relative">
+                                    {/* Handicap Strokes Indicators */}
+                                    {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                                      <div className="handicap-strokes">
+                                        {Array.from({ length: playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0 }).map((_, i) => (
+                                          <div key={i} className="handicap-indicator"></div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {isBestBall ? (
+                                      <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                        getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                                      }`}>
+                                        {getScoreInputValue(hole.number, "producer") || ""}
+                                      </div>
+                                    ) : (
+                                      canEditScores && !locked ? (
+                                        <input
+                                          type="tel"
+                                          inputMode="numeric"
+                                          pattern="[0-9]*"
+                                          data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
+                                          className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                            ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                              getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
+                                          value={getScoreInputValue(hole.number, "producer")}
+                                          onChange={(e) =>
+                                            handleScoreChange(
+                                              hole.number,
+                                              "producer",
+                                              e.target.value,
+                                              e.target
+                                            )
+                                          }
+                                          min="1"
+                                          max="12"
+                                          disabled={isHoleGreyedOut(hole.number)}
+                                        />
                                       ) : (
-                                        canEditScores ? (
-                                          <input
-                                            type="tel"
-                                            inputMode="numeric"
-                                            pattern="[0-9]*"
-                                            data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
-                                            className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                              ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                                getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
-                                            value={getScoreInputValue(hole.number, "producer")}
-                                            onChange={(e) =>
-                                              handlePlayerScoreChange(
-                                                hole.number,
-                                                player.name,
-                                                "producer",
-                                                e.target.value,
-                                                e.target
-                                              )
-                                            }
-                                            min="1"
-                                            max="12"
-                                            disabled={isHoleGreyedOut(hole.number) || locked}
-                                          />
-                                        ) : (
-                                          <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                                            getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
-                                          }`}>
-                                            {getScoreInputValue(hole.number, "producer") || ""}
-                                          </div>
-                                        )
-                                      )}
-                                      {/* Net Score Display */}
-                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
-                                       playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
-                                        <span className="net-score">
-                                          ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                );
-                              })}
-                              <td className="py-2 px-2 text-center font-semibold bg-gray-100">
-                                {playerFrontNineTotals.get(player.name) || ""}
-                              </td>
-                              {/* Back Nine Producer Player Scores */}
-                              {backNine.map((hole) => {
-                                const isLowest = isLowestScore(
-                                  hole.number,
-                                  player.name,
-                                  "producer",
-                                );
-                                return (
-                                  <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
-                                    <div className="relative">
-                                      {/* Handicap Strokes Indicators */}
-                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
-                                        <div className="handicap-strokes">
-                                          {Array.from({ length: playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0 }).map((_, i) => (
-                                            <div key={i} className="handicap-indicator"></div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {isBestBall ? (
                                         <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                                           getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
                                         }`}>
                                           {getScoreInputValue(hole.number, "producer") || ""}
                                         </div>
-                                      ) : (
-                                        canEditScores ? (
-                                          <input
-                                            type="tel"
-                                            inputMode="numeric"
-                                            pattern="[0-9]*"
-                                            data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
-                                            className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                              ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                                getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
-                                            value={getScoreInputValue(hole.number, "producer")}
-                                            onChange={(e) =>
-                                              handlePlayerScoreChange(
-                                                hole.number,
-                                                player.name,
-                                                "producer",
-                                                e.target.value,
-                                                e.target
-                                              )
-                                            }
-                                            min="1"
-                                            max="12"
-                                            disabled={isHoleGreyedOut(hole.number) || locked}
-                                          />
-                                        ) : (
-                                          <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                                            getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
-                                          }`}>
-                                            {getScoreInputValue(hole.number, "producer") || ""}
-                                          </div>
-                                        )
-                                      )}
-                                      {/* Net Score Display */}
-                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
-                                       playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
-                                        <span className="net-score">
-                                          ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                );
-                              })}
-                              <td className="py-2 px-2 text-center font-semibold bg-gray-100">
-                                {playerBackNineTotals.get(player.name) || ""}
-                              </td>
-                              <td className="py-2 px-2 text-center font-semibold bg-gray-200">
-                                {playerTotals.get(player.name) || ""}
-                    </td>
-                  </tr>
-                ))}
-              </>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
+                                      )
+                                    )}
+                                    {/* Net Score Display */}
+                                    {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
+                                     playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                                      <span className="net-score">
+                                        ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                            <td className="py-2 px-2 text-center font-semibold bg-gray-100">
+                              {playerBackNineTotals.get(player.name) || ""}
+                            </td>
+                            <td className="py-2 px-2 text-center font-semibold bg-gray-200">
+                              {playerTotals.get(player.name) || ""}
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        };
 
-export default EnhancedMatchScorecard;
+        export default EnhancedMatchScorecard;
