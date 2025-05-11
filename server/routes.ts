@@ -1423,6 +1423,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get player's matchups against other players
+  app.get("/api/players/:playerId/matchups", async (req, res) => {
+    try {
+      const playerId = parseInt(req.params.playerId);
+      
+      if (isNaN(playerId)) {
+        return res.status(400).json({ error: "Invalid player ID" });
+      }
+      
+      const matchups = await storage.getPlayerMatchups(playerId);
+      res.json(matchups);
+    } catch (error) {
+      console.error("Error getting player matchups:", error);
+      res.status(500).json({ error: "Failed to get player matchups" });
+    }
+  });
+
+  // Get player's stats by match type
+  app.get("/api/players/:playerId/match-type-stats", async (req, res) => {
+    try {
+      const playerId = parseInt(req.params.playerId);
+      
+      if (isNaN(playerId)) {
+        return res.status(400).json({ error: "Invalid player ID" });
+      }
+      
+      const matchTypeStats = await storage.getPlayerAllMatchTypeStats(playerId);
+      res.json(matchTypeStats);
+    } catch (error) {
+      console.error("Error getting player match type stats:", error);
+      res.status(500).json({ error: "Failed to get player match type stats" });
+    }
+  });
+
   // Admin: Update tournament history (recalculate and store current tournament statistics)
   app.post("/api/admin/tournament-history/update", isAdmin, async (req, res) => {
     try {
