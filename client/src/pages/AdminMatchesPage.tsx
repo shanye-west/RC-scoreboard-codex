@@ -183,32 +183,25 @@ export default function AdminMatchesPage() {
     });
   };
 
-  // Check if a player is already participating in a match in this round
+  // Check if a player is already in any match in this round
   const isPlayerInAnyMatch = (playerId: number): boolean => {
     if (!matches || !players) return false;
-
+    
+    // Find the player
     const player = players.find(p => p.id === playerId);
     if (!player) return false;
-
-    // Check each active match
+    
+    // Check all active matches in this round
     return matches.some(match => {
       // Skip deleted matches
-      if (match.status === 'deleted') return false;
-
-      // Get all player IDs from both teams
-      const aviatorPlayerIds = match.aviatorPlayers ? 
-        match.aviatorPlayers.split(',').map(name => {
-          const p = players.find(p => p.name === name.trim());
-          return p?.id;
-        }).filter(Boolean) : [];
+      if (match.deleted) return false;
       
-      const producerPlayerIds = match.producerPlayers ? 
-        match.producerPlayers.split(',').map(name => {
-          const p = players.find(p => p.name === name.trim());
-          return p?.id;
-        }).filter(Boolean) : [];
-
-      return aviatorPlayerIds.includes(playerId) || producerPlayerIds.includes(playerId);
+      // Split players into arrays
+      const aviatorPlayers = match.aviatorPlayers.split(',').map(p => p.trim());
+      const producerPlayers = match.producerPlayers.split(',').map(p => p.trim());
+      
+      // Check if player's name is in either team
+      return aviatorPlayers.includes(player.name) || producerPlayers.includes(player.name);
     });
   };
 

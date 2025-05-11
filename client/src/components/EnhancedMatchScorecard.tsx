@@ -1165,7 +1165,7 @@ const EnhancedMatchScorecard = ({
                               }
                               min="1"
                               max="12"
-                              disabled={isHoleGreyedOut(hole.number) || locked}
+                              disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                             />
                             {/* Net Score Display - only show when score is entered */}
                             {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
@@ -1224,7 +1224,7 @@ const EnhancedMatchScorecard = ({
                                         }
                                         min="1"
                                         max="12"
-                                        disabled={isHoleGreyedOut(hole.number) || locked}
+                                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
                                       {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
@@ -1461,7 +1461,7 @@ const EnhancedMatchScorecard = ({
                                 }
                                 min="1"
                                 max="12"
-                                disabled={isHoleGreyedOut(hole.number) || locked}
+                                disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                               />
                             ) : (
                               <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
@@ -1552,7 +1552,7 @@ const EnhancedMatchScorecard = ({
                                         }
                                         min="1"
                                         max="12"
-                                        disabled={isHoleGreyedOut(hole.number) || locked}
+                                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
                                       {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
@@ -1611,7 +1611,7 @@ const EnhancedMatchScorecard = ({
                                         }
                                         min="1"
                                         max="12"
-                                        disabled={isHoleGreyedOut(hole.number) || locked}
+                                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
                                       {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
