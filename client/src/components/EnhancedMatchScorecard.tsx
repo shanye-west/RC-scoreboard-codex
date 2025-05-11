@@ -1263,7 +1263,7 @@ const EnhancedMatchScorecard = ({
                               }`}>
                                 {getScoreInputValue(hole.number, "aviator") || ""}
                               </div>
-                            ) : (
+                            ) : canEditScores ? (
                               <input
                                 type="tel"
                                 inputMode="numeric"
@@ -1284,6 +1284,12 @@ const EnhancedMatchScorecard = ({
                                 max="12"
                                 disabled={isHoleGreyedOut(hole.number) || locked}
                               />
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "aviator") || ""}
+                              </div>
                             )}
                           </td>
                         ))}
@@ -1302,7 +1308,7 @@ const EnhancedMatchScorecard = ({
                               }`}>
                                 {getScoreInputValue(hole.number, "aviator") || ""}
                               </div>
-                            ) : (
+                            ) : canEditScores ? (
                               <input
                                 type="tel"
                                 inputMode="numeric"
@@ -1323,6 +1329,12 @@ const EnhancedMatchScorecard = ({
                                 max="12"
                                 disabled={isHoleGreyedOut(hole.number) || locked}
                               />
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "aviator") || ""}
+                              </div>
                             )}
                           </td>
                         ))}
@@ -1385,7 +1397,7 @@ const EnhancedMatchScorecard = ({
                               }`}>
                                 {getScoreInputValue(hole.number, "producer") || ""}
                               </div>
-                            ) : (
+                            ) : canEditScores ? (
                               <input
                                 type="tel"
                                 inputMode="numeric"
@@ -1406,6 +1418,12 @@ const EnhancedMatchScorecard = ({
                                 max="12"
                                 disabled={isHoleGreyedOut(hole.number) || locked}
                               />
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "producer") || ""}
+                              </div>
                             )}
                           </td>
                         ))}
@@ -1424,7 +1442,7 @@ const EnhancedMatchScorecard = ({
                               }`}>
                                 {getScoreInputValue(hole.number, "producer") || ""}
                               </div>
-                            ) : (
+                            ) : canEditScores ? (
                               <input
                                 type="tel"
                                 inputMode="numeric"
@@ -1445,6 +1463,12 @@ const EnhancedMatchScorecard = ({
                                 max="12"
                                 disabled={isHoleGreyedOut(hole.number) || locked}
                               />
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "producer") || ""}
+                              </div>
                             )}
                           </td>
                         ))}
