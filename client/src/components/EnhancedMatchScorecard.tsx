@@ -1277,33 +1277,41 @@ const EnhancedMatchScorecard = ({
                       {/* Front Nine Aviator Scores */}
                       {frontNine.map((hole) => (
                         <td key={hole.number} className="py-2 px-2 text-center">
-                          {canEditScores && !locked ? (
-                            <input
-                              type="tel"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                  getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"}`}
-                              value={getScoreInputValue(hole.number, "aviator")}
-                              onChange={(e) =>
-                                handleScoreChange(
-                                  hole.number,
-                                  "aviator",
-                                  e.target.value,
-                                  e.target
-                                )
-                              }
-                              min="1"
-                              max="12"
-                              disabled={isHoleGreyedOut(hole.number)}
-                            />
-                          ) : (
+                          {isBestBall ? (
                             <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                               getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
                             }`}>
                               {getScoreInputValue(hole.number, "aviator") || ""}
                             </div>
+                          ) : (
+                            canEditScores && !locked ? (
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                  ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                    getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"}`}
+                                value={getScoreInputValue(hole.number, "aviator")}
+                                onChange={(e) =>
+                                  handleScoreChange(
+                                    hole.number,
+                                    "aviator",
+                                    e.target.value,
+                                    e.target
+                                  )
+                                }
+                                min="1"
+                                max="12"
+                                disabled={isHoleGreyedOut(hole.number)}
+                              />
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "aviator") || ""}
+                              </div>
+                            )
                           )}
                         </td>
                       ))}
@@ -1316,33 +1324,41 @@ const EnhancedMatchScorecard = ({
                       {/* Back Nine Aviator Scores */}
                       {backNine.map((hole) => (
                         <td key={hole.number} className="py-2 px-2 text-center">
-                          {canEditScores && !locked ? (
-                            <input
-                              type="tel"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                  getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"}`}
-                              value={getScoreInputValue(hole.number, "aviator")}
-                              onChange={(e) =>
-                                handleScoreChange(
-                                  hole.number,
-                                  "aviator",
-                                  e.target.value,
-                                  e.target
-                                )
-                              }
-                              min="1"
-                              max="12"
-                              disabled={isHoleGreyedOut(hole.number)}
-                            />
-                          ) : (
+                          {isBestBall ? (
                             <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                               getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
                             }`}>
                               {getScoreInputValue(hole.number, "aviator") || ""}
                             </div>
+                          ) : (
+                            canEditScores && !locked ? (
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                  ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                    getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"}`}
+                                value={getScoreInputValue(hole.number, "aviator")}
+                                onChange={(e) =>
+                                  handleScoreChange(
+                                    hole.number,
+                                    "aviator",
+                                    e.target.value,
+                                    e.target
+                                  )
+                                }
+                                min="1"
+                                max="12"
+                                disabled={isHoleGreyedOut(hole.number)}
+                              />
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "aviator") || ""}
+                              </div>
+                            )
                           )}
                         </td>
                       ))}
@@ -1399,33 +1415,41 @@ const EnhancedMatchScorecard = ({
                       {/* Front Nine Producer Scores */}
                       {frontNine.map((hole) => (
                         <td key={hole.number} className="py-2 px-2 text-center">
-                          {canEditScores && !locked ? (
-                            <input
-                              type="tel"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                  getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
-                              value={getScoreInputValue(hole.number, "producer")}
-                              onChange={(e) =>
-                                handleScoreChange(
-                                  hole.number,
-                                  "producer",
-                                  e.target.value,
-                                  e.target
-                                )
-                              }
-                              min="1"
-                              max="12"
-                              disabled={isHoleGreyedOut(hole.number)}
-                            />
-                          ) : (
+                          {isBestBall ? (
                             <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                               getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
                             }`}>
                               {getScoreInputValue(hole.number, "producer") || ""}
                             </div>
+                          ) : (
+                            canEditScores && !locked ? (
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                  ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                    getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
+                                value={getScoreInputValue(hole.number, "producer")}
+                                onChange={(e) =>
+                                  handleScoreChange(
+                                    hole.number,
+                                    "producer",
+                                    e.target.value,
+                                    e.target
+                                  )
+                                }
+                                min="1"
+                                max="12"
+                                disabled={isHoleGreyedOut(hole.number)}
+                              />
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "producer") || ""}
+                              </div>
+                            )
                           )}
                         </td>
                       ))}
@@ -1438,33 +1462,41 @@ const EnhancedMatchScorecard = ({
                       {/* Back Nine Producer Scores */}
                       {backNine.map((hole) => (
                         <td key={hole.number} className="py-2 px-2 text-center">
-                          {canEditScores && !locked ? (
-                            <input
-                              type="tel"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
-                                ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
-                                  getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
-                              value={getScoreInputValue(hole.number, "producer")}
-                              onChange={(e) =>
-                                handleScoreChange(
-                                  hole.number,
-                                  "producer",
-                                  e.target.value,
-                                  e.target
-                                )
-                              }
-                              min="1"
-                              max="12"
-                              disabled={isHoleGreyedOut(hole.number)}
-                            />
-                          ) : (
+                          {isBestBall ? (
                             <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
                               getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
                             }`}>
                               {getScoreInputValue(hole.number, "producer") || ""}
                             </div>
+                          ) : (
+                            canEditScores && !locked ? (
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className={`score-input w-16 h-8 text-center border border-gray-300 rounded 
+                                  ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed text-black" : 
+                                    getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"}`}
+                                value={getScoreInputValue(hole.number, "producer")}
+                                onChange={(e) =>
+                                  handleScoreChange(
+                                    hole.number,
+                                    "producer",
+                                    e.target.value,
+                                    e.target
+                                  )
+                                }
+                                min="1"
+                                max="12"
+                                disabled={isHoleGreyedOut(hole.number)}
+                              />
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "producer") || ""}
+                              </div>
+                            )
                           )}
                         </td>
                       ))}
