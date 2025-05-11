@@ -6,8 +6,8 @@ import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import aviatorsLogo from "../assets/aviators-text.svg";
-import producersLogo from "../assets/producers-text.svg";
+import aviatorsLogo from "../assets/aviators-logo.svg";
+import producersLogo from "../assets/producers-logo.svg";
 
 interface Round {
   id: number;
