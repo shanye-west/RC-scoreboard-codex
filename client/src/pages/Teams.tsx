@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { useState } from "react";
+import aviatorsText from "@/assets/aviators-text.svg";
+import producersText from "@/assets/producers-text.svg";
 
 interface Player {
   id: number;
@@ -100,7 +102,7 @@ const Teams = () => {
               }`}
               onClick={() => setActiveTeam(1)}
             >
-              <img src="/aviators-text.svg" alt="The Aviators" className="h-8" />
+              <img src={aviatorsText} alt="The Aviators" className="h-8" />
             </div>
             <div 
               className={`cursor-pointer transition-opacity ${
@@ -108,7 +110,7 @@ const Teams = () => {
               }`}
               onClick={() => setActiveTeam(2)}
             >
-              <img src="/producers-text.svg" alt="The Producers" className="h-8" />
+              <img src={producersText} alt="The Producers" className="h-8" />
             </div>
           </div>
           
