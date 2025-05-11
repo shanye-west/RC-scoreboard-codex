@@ -1234,34 +1234,30 @@ export class DBStorage implements IStorage {
         lastPlayed: new Date().toISOString()
       };
       
-      if (adjustedResult === "win") updates.wins = existing.wins + 1;
-      else if (adjustedResult === "loss") updates.losses = existing.losses + 1;
-      else updates.ties = existing.ties + 1;
+      if (adjustedResult === "win") updates.wins = (existing.wins || 0) + 1;
+      else if (adjustedResult === "loss") updates.losses = (existing.losses || 0) + 1;
+      else updates.ties = (existing.ties || 0) + 1;
       
-      const [row] = await db.update(playerMatchups)
+      const [row] = await db.update(player_matchups)
         .set(updates)
         .where(and(
-          eq(playerMatchups.playerId1, smallerId),
-          eq(playerMatchups.playerId2, largerId)
+          eq(player_matchups.playerId1, smallerId),
+          eq(player_matchups.playerId2, largerId)
         ))
         .returning();
       return row;
     } else {
       // Create new record
-      const data: Record<string, any> = {
+      const data = {
         playerId1: smallerId,
         playerId2: largerId,
-        wins: 0,
-        losses: 0,
-        ties: 0,
+        wins: adjustedResult === "win" ? 1 : 0,
+        losses: adjustedResult === "loss" ? 1 : 0,
+        ties: adjustedResult === "tie" ? 1 : 0,
         lastPlayed: new Date().toISOString()
       };
       
-      if (adjustedResult === "win") data.wins = 1;
-      else if (adjustedResult === "loss") data.losses = 1;
-      else data.ties = 1;
-      
-      const [row] = await db.insert(playerMatchups)
+      const [row] = await db.insert(player_matchups)
         .values(data)
         .returning();
       return row;
@@ -1271,23 +1267,23 @@ export class DBStorage implements IStorage {
   async getPlayerMatchups(playerId: number) {
     // Get matchups where player is either player1 or player2
     return db.select()
-      .from(playerMatchups)
+      .from(player_matchups)
       .where(or(
-        eq(playerMatchups.playerId1, playerId),
-        eq(playerMatchups.playerId2, playerId)
+        eq(player_matchups.playerId1, playerId),
+        eq(player_matchups.playerId2, playerId)
       ))
-      .orderBy(desc(playerMatchups.lastPlayed));
+      .orderBy(desc(player_matchups.lastPlayed));
   }
   
   // Player match type stats methods
   async getPlayerMatchTypeStats(playerId: number, matchType: string) {
     const [row] = await db
       .select()
-      .from(playerMatchTypeStats)
+      .from(player_match_type_stats)
       .where(
         and(
-          eq(playerMatchTypeStats.playerId, playerId),
-          eq(playerMatchTypeStats.matchType, matchType)
+          eq(player_match_type_stats.playerId, playerId),
+          eq(player_match_type_stats.matchType, matchType)
         )
       );
     return row;
@@ -1302,15 +1298,15 @@ export class DBStorage implements IStorage {
         lastUpdated: new Date().toISOString()
       };
       
-      if (result === "win") updates.wins = existing.wins + 1;
-      else if (result === "loss") updates.losses = existing.losses + 1;
-      else updates.ties = existing.ties + 1;
+      if (result === "win") updates.wins = (existing.wins || 0) + 1;
+      else if (result === "loss") updates.losses = (existing.losses || 0) + 1;
+      else updates.ties = (existing.ties || 0) + 1;
       
-      const [row] = await db.update(playerMatchTypeStats)
+      const [row] = await db.update(player_match_type_stats)
         .set(updates)
         .where(and(
-          eq(playerMatchTypeStats.playerId, playerId),
-          eq(playerMatchTypeStats.matchType, matchType)
+          eq(player_match_type_stats.playerId, playerId),
+          eq(player_match_type_stats.matchType, matchType)
         ))
         .returning();
       return row;
@@ -1329,7 +1325,7 @@ export class DBStorage implements IStorage {
       else if (result === "loss") data.losses = 1;
       else data.ties = 1;
       
-      const [row] = await db.insert(playerMatchTypeStats)
+      const [row] = await db.insert(player_match_type_stats)
         .values(data)
         .returning();
       return row;
@@ -1338,9 +1334,9 @@ export class DBStorage implements IStorage {
 
   async getPlayerAllMatchTypeStats(playerId: number) {
     return db.select()
-      .from(playerMatchTypeStats)
-      .where(eq(playerMatchTypeStats.playerId, playerId))
-      .orderBy(desc(playerMatchTypeStats.lastUpdated));
+      .from(player_match_type_stats)
+      .where(eq(player_match_type_stats.playerId, playerId))
+      .orderBy(desc(player_match_type_stats.lastUpdated));
   }
   
   // Stats calculations methods
