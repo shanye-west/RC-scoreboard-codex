@@ -311,7 +311,7 @@
               <div className="flex mb-2">
                 <div className="w-1/2 border-r border-gray-200 pr-3">
                   <div className="flex items-center mb-1">
-                    <div className="w-3 h-3 rounded-full bg-aviator mr-2"></div>
+                    <img src={aviatorsLogo} alt="Aviators" className="h-5 mr-2" />
                     <span className="font-semibold text-aviator">The Aviators</span>
                   </div>
                   <div className="text-sm text-gray-600">
@@ -324,7 +324,7 @@
                 <div className="w-1/2 pl-3">
                   <div className="flex items-center justify-end mb-1">
                     <span className="font-semibold text-producer">The Producers</span>
-                    <div className="w-3 h-3 rounded-full bg-producer ml-2"></div>
+                    <img src={producersLogo} alt="Producers" className="h-5 ml-2" />
                   </div>
                   <div className="text-sm text-gray-600 text-right">
                     {match.producerPlayers.split(', ').map((player, index) => (

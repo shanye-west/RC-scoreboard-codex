@@ -6,6 +6,8 @@ import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import aviatorsLogo from "../assets/aviators-text.svg";
+import producersLogo from "../assets/producers-text.svg";
 
 interface Round {
   id: number;
@@ -135,7 +137,7 @@ const RoundsList = ({ rounds }: RoundsListProps) => {
           <div className="p-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center">
-                <div className="w-3 h-3 rounded-full bg-aviator mr-2"></div>
+                <img src={aviatorsLogo} alt="Aviators" className="h-5 mr-2" />
                 <div className="relative">
                   <span className="font-semibold">{parseFloat(round.aviatorScore.toString())}</span>
                 </div>
@@ -144,7 +146,7 @@ const RoundsList = ({ rounds }: RoundsListProps) => {
                 <div className="relative">
                   <span className="font-semibold">{parseFloat(round.producerScore.toString())}</span>
                 </div>
-                <div className="w-3 h-3 rounded-full bg-producer ml-2"></div>
+                <img src={producersLogo} alt="Producers" className="h-5 ml-2" />
               </div>
             </div>
             <div className="mt-2 text-sm text-gray-500 flex justify-between items-center">
