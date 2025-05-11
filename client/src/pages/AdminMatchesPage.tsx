@@ -195,11 +195,20 @@ export default function AdminMatchesPage() {
       // Skip deleted matches
       if (match.status === 'deleted') return false;
 
-      // Check both teams for the player
-      return (
-        (match.aviatorPlayers && match.aviatorPlayers.includes(player.name)) ||
-        (match.producerPlayers && match.producerPlayers.includes(player.name))
-      );
+      // Get all player IDs from both teams
+      const aviatorPlayerIds = match.aviatorPlayers ? 
+        match.aviatorPlayers.split(',').map(name => {
+          const p = players.find(p => p.name === name.trim());
+          return p?.id;
+        }).filter(Boolean) : [];
+      
+      const producerPlayerIds = match.producerPlayers ? 
+        match.producerPlayers.split(',').map(name => {
+          const p = players.find(p => p.name === name.trim());
+          return p?.id;
+        }).filter(Boolean) : [];
+
+      return aviatorPlayerIds.includes(playerId) || producerPlayerIds.includes(playerId);
     });
   };
 
