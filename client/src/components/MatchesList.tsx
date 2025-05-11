@@ -287,7 +287,6 @@
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
-                        {/* Add lock button */}
                         <Button
                           size="icon"
                           variant="ghost"
@@ -334,11 +333,8 @@
                   </div>
                 </div>
               </div>
-            </div>
 
-              {/* Display match status */}
               {renderMatchStatusDisplay(match)}
-
               {renderMatchResult(match)}
             </div>
           </div>
