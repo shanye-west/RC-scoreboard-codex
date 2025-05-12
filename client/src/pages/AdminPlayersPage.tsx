@@ -298,48 +298,63 @@ const AdminPlayersPage = () => {
               </div>
               
               <div className="divide-y">
-                {playersByTeam?.[team.id]?.map((player: Player) => (
-                  <div key={player.id} className="py-3 flex justify-between items-center">
-                    <div className="flex items-center">
-                      <span className="font-medium">{player.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditPlayer(player)}
-                        className="ml-2 text-blue-500 hover:text-blue-700 hover:bg-blue-100 p-1 h-auto"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeletePlayer(player.id)}
-                        className="ml-1 text-red-500 hover:text-red-700 hover:bg-red-100 p-1 h-auto"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="text-sm text-muted-foreground">
-                        Record:
+                {playersByTeam?.[team.id]?.map((player: Player) => {
+                  // Convert hex color to rgba with alpha 0.05
+                  const teamColor = team.colorCode ? `${team.colorCode}0D` : 'transparent';
+                  const hexToRgba = (hex: string, alpha: number = 0.05) => {
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                  };
+                  
+                  return (
+                    <div 
+                      key={player.id} 
+                      className="py-3 flex justify-between items-center px-3 rounded-md mb-1"
+                      style={{ backgroundColor: hexToRgba(team.colorCode) }}
+                    >
+                      <div className="flex items-center">
+                        <span className="font-medium">{player.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditPlayer(player)}
+                          className="ml-2 text-blue-500 hover:text-blue-700 hover:bg-blue-100 p-1 h-auto"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeletePlayer(player.id)}
+                          className="ml-1 text-red-500 hover:text-red-700 hover:bg-red-100 p-1 h-auto"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <span className={`px-3 py-1 rounded-md text-white font-mono ${
-                        player.wins > player.losses 
-                          ? 'bg-green-600' 
-                          : player.losses > player.wins 
-                            ? 'bg-red-600' 
-                            : 'bg-gray-500'
-                      }`}>
-                        {player.wins}-{player.losses}-{player.ties}
-                      </span>
-                      {player.wins + player.losses + player.ties > 0 && (
-                        <div className="text-xs text-muted-foreground">
-                          {((player.wins / (player.wins + player.losses + player.ties)) * 100).toFixed(0)}%
+                      <div className="flex items-center space-x-3">
+                        <div className="text-sm text-muted-foreground">
+                          Record:
                         </div>
-                      )}
+                        <span className={`px-3 py-1 rounded-md text-white font-mono ${
+                          player.wins > player.losses 
+                            ? 'bg-green-600' 
+                            : player.losses > player.wins 
+                              ? 'bg-red-600' 
+                              : 'bg-gray-500'
+                        }`}>
+                          {player.wins}-{player.losses}-{player.ties}
+                        </span>
+                        {player.wins + player.losses + player.ties > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            {((player.wins / (player.wins + player.losses + player.ties)) * 100).toFixed(0)}%
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {(!playersByTeam?.[team.id] || playersByTeam?.[team.id]?.length === 0) && (
                   <div className="py-4 text-center text-muted-foreground">
                     No players in this team
