@@ -44,6 +44,13 @@ app.use((req, res, next) => {
   next();
 });
 
+// Helper function to capture error details
+function captureError(err: any) {
+  const timestamp = new Date().toISOString();
+  console.error(`[${timestamp}] Error:`, err);
+  return { timestamp, error: err };
+}
+
 (async () => {
   // 3) Smoke-test Neon on startup
   try {
@@ -56,13 +63,6 @@ app.use((req, res, next) => {
 
   // 4) Register your routes and get the underlying HTTP server
   const server = await registerRoutes(app);
-
-  // Helper function to capture error details
-  function captureError(err: any) {
-    const timestamp = new Date().toISOString();
-    console.error(`[${timestamp}] Error:`, err);
-    return { timestamp, error: err };
-  }
 
   // 5) Global error handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
