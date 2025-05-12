@@ -78,10 +78,10 @@ export const playersRelations = relations(players, ({one, many}) => ({
         playerCareerStats: many(playerCareerStats),
         matchParticipants: many(matchParticipants),
         playerMatchTypeStats: many(playerMatchTypeStats),
-        // Matchups where this player is player1
-        matchupsAsPlayer1: many(playerMatchups, { relationName: "player1Matchups" }),
-        // Matchups where this player is player2
-        matchupsAsPlayer2: many(playerMatchups, { relationName: "player2Matchups" }),
+        // Player matchups
+        playerMatchups: many(playerMatchups, { relationName: "playerMatchups" }),
+        // Opponent matchups
+        opponentMatchups: many(playerMatchups, { relationName: "opponentMatchups" }),
 }));
 
 export const teamsRelations = relations(teams, ({many}) => ({
@@ -162,13 +162,21 @@ export const matchParticipantsRelations = relations(matchParticipants, ({one}) =
 }));
 
 export const playerMatchupsRelations = relations(playerMatchups, ({one}) => ({
-        player1: one(players, {
-                fields: [playerMatchups.playerId1],
+        player: one(players, {
+                fields: [playerMatchups.playerId],
                 references: [players.id]
         }),
-        player2: one(players, {
-                fields: [playerMatchups.playerId2],
+        opponent: one(players, {
+                fields: [playerMatchups.opponentId],
                 references: [players.id]
+        }),
+        match: one(matches, {
+                fields: [playerMatchups.matchId],
+                references: [matches.id]
+        }),
+        tournament: one(tournament, {
+                fields: [playerMatchups.tournamentId],
+                references: [tournament.id]
         }),
 }));
 

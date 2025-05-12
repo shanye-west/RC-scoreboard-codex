@@ -1,7 +1,7 @@
 // server/storage.ts
 
 import { db } from "./db";
-import { eq, and, isNull, not, sql, or, desc } from "drizzle-orm";
+import { eq, and, isNull, not, sql, or, desc, count } from "drizzle-orm";
 import {
   users,
   players,
@@ -20,6 +20,7 @@ import {
   player_matchups,
   player_match_type_stats,
   bets,
+  InsertPlayerMatchup
 } from "@shared/schema";
 
 export interface IStorage {
@@ -122,9 +123,11 @@ export interface IStorage {
   updatePlayerCareerStats(playerId: number, stats: any): Promise<any>;
   
   // Player matchup methods
-  getPlayerMatchup(playerId1: number, playerId2: number): Promise<any | undefined>;
-  updatePlayerMatchup(playerId1: number, playerId2: number, result: "win" | "loss" | "tie"): Promise<any>;
+  createPlayerMatchup(data: any): Promise<any>;
   getPlayerMatchups(playerId: number): Promise<any[]>;
+  getPlayerMatchupsByMatch(matchId: number): Promise<any[]>;
+  getPlayerVsOpponentMatchups(playerId: number, opponentId: number): Promise<any[]>;
+  getPlayerMatchupsStats(playerId: number): Promise<{wins: number, losses: number, ties: number}>;
   
   // Player match type stats methods
   getPlayerMatchTypeStats(playerId: number, matchType: string): Promise<any | undefined>;
@@ -957,7 +960,7 @@ export class DBStorage implements IStorage {
           // Update player match type stats
           await this.updatePlayerMatchTypeStats(player.id, matchType, matchResult);
           
-          // Update player matchups against all opponents
+          // Create player matchups against all opponents
           for (const opponent of participants) {
             // Skip self
             if (opponent.playerId === participant.playerId) continue;
@@ -965,12 +968,18 @@ export class DBStorage implements IStorage {
             // Skip teammates
             if (opponent.team === participant.team) continue;
             
-            // Update matchup
-            await this.updatePlayerMatchup(
-              player.id, 
-              opponent.playerId, 
-              matchResult
-            );
+            // Get tournament id from round
+            const tournamentId = round?.tournamentId;
+            
+            // Create individual matchup record
+            await this.createPlayerMatchup({
+              playerId: player.id,
+              opponentId: opponent.playerId,
+              matchId,
+              tournamentId: tournamentId || undefined,
+              result: matchResult,
+              matchType
+            });
           }
         }
       }
@@ -1222,85 +1231,83 @@ export class DBStorage implements IStorage {
   }
   
   // Player matchup methods
-  async getPlayerMatchup(playerId1: number, playerId2: number) {
-    // Ensure smaller ID is always first to maintain consistency
-    const [smallerId, largerId] = playerId1 < playerId2 
-      ? [playerId1, playerId2] 
-      : [playerId2, playerId1];
-    
-    const [row] = await db
-      .select()
-      .from(player_matchups)
-      .where(
-        and(
-          eq(player_matchups.playerId1, smallerId),
-          eq(player_matchups.playerId2, largerId)
-        )
-      );
+  async createPlayerMatchup(data: InsertPlayerMatchup) {
+    const [row] = await db.insert(player_matchups)
+      .values(data)
+      .returning();
     return row;
   }
 
-  async updatePlayerMatchup(playerId1: number, playerId2: number, result: "win" | "loss" | "tie") {
-    // Ensure smaller ID is always first to maintain consistency
-    const [smallerId, largerId] = playerId1 < playerId2 
-      ? [playerId1, playerId2] 
-      : [playerId2, playerId1];
-    
-    // Need to adjust result if we swapped player order
-    let adjustedResult = result;
-    if (smallerId !== playerId1) {
-      // If we swapped the order, we need to invert the result
-      if (result === "win") adjustedResult = "loss";
-      else if (result === "loss") adjustedResult = "win";
-    }
-    
-    const existing = await this.getPlayerMatchup(smallerId, largerId);
-    
-    if (existing) {
-      // Update existing record
-      const updates: Record<string, any> = {
-        lastPlayed: new Date().toISOString()
-      };
-      
-      if (adjustedResult === "win") updates.wins = (existing.wins || 0) + 1;
-      else if (adjustedResult === "loss") updates.losses = (existing.losses || 0) + 1;
-      else updates.ties = (existing.ties || 0) + 1;
-      
-      const [row] = await db.update(player_matchups)
-        .set(updates)
-        .where(and(
-          eq(player_matchups.playerId1, smallerId),
-          eq(player_matchups.playerId2, largerId)
-        ))
-        .returning();
-      return row;
-    } else {
-      // Create new record
-      const data = {
-        playerId1: smallerId,
-        playerId2: largerId,
-        wins: adjustedResult === "win" ? 1 : 0,
-        losses: adjustedResult === "loss" ? 1 : 0,
-        ties: adjustedResult === "tie" ? 1 : 0,
-        lastPlayed: new Date().toISOString()
-      };
-      
-      const [row] = await db.insert(player_matchups)
-        .values(data)
-        .returning();
-      return row;
-    }
-  }
-
   async getPlayerMatchups(playerId: number) {
-    // Get matchups where player is either player1 or player2
+    // Get matchups where player is either the player or the opponent
     return db.select()
       .from(player_matchups)
       .where(or(
-        eq(player_matchups.playerId1, playerId),
-        eq(player_matchups.playerId2, playerId)
+        eq(player_matchups.playerId, playerId),
+        eq(player_matchups.opponentId, playerId)
       ))
-      .orderBy(desc(player_matchups.lastPlayed));
+      .orderBy(desc(player_matchups.createdAt));
+  }
+  
+  async getPlayerMatchupsByMatch(matchId: number) {
+    return db.select()
+      .from(player_matchups)
+      .where(eq(player_matchups.matchId, matchId))
+      .orderBy(player_matchups.playerId);
+  }
+  
+  async getPlayerVsOpponentMatchups(playerId: number, opponentId: number) {
+    return db.select()
+      .from(player_matchups)
+      .where(
+        or(
+          and(
+            eq(player_matchups.playerId, playerId),
+            eq(player_matchups.opponentId, opponentId)
+          ),
+          and(
+            eq(player_matchups.playerId, opponentId),
+            eq(player_matchups.opponentId, playerId)
+          )
+        )
+      )
+      .orderBy(desc(player_matchups.createdAt));
+  }
+  
+  async getPlayerMatchupsStats(playerId: number) {
+    // Calculate aggregated stats from individual matchup records
+    const wins = await db.select({ count: count() })
+      .from(player_matchups)
+      .where(
+        and(
+          eq(player_matchups.playerId, playerId),
+          eq(player_matchups.result, 'win')
+        )
+      );
+    
+    const losses = await db.select({ count: count() })
+      .from(player_matchups)
+      .where(
+        and(
+          eq(player_matchups.playerId, playerId),
+          eq(player_matchups.result, 'loss')
+        )
+      );
+    
+    const ties = await db.select({ count: count() })
+      .from(player_matchups)
+      .where(
+        and(
+          eq(player_matchups.playerId, playerId),
+          eq(player_matchups.result, 'tie')
+        )
+      );
+    
+    return {
+      wins: wins[0]?.count || 0,
+      losses: losses[0]?.count || 0,
+      ties: ties[0]?.count || 0
+    };
   }
   
   // Player match type stats methods
