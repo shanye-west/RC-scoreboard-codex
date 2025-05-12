@@ -115,34 +115,27 @@ const Teams = () => {
           </div>
           
           <div className="divide-y">
-            {playersByTeam?.[activeTeam]?.map((player: Player) => {
-              const teamColor = activeTeam === 1 ? 'rgba(0, 74, 127, 0.05)' : 'rgba(128, 0, 0, 0.05)';
-              return (
-                <div 
-                  key={player.id} 
-                  className="py-3 flex justify-between items-center px-3 rounded-md"
-                  style={{ backgroundColor: teamColor }}
-                >
-                  <span className="font-medium">{player.name}</span>
-                  <div className="flex items-center space-x-3">
-                    <span className={`px-3 py-1 rounded-md text-white font-mono ${
-                      player.wins > player.losses 
-                        ? 'bg-green-600' 
-                        : player.losses > player.wins 
-                          ? 'bg-red-600' 
-                          : 'bg-gray-500'
-                    }`}>
-                      {player.wins}-{player.losses}-{player.ties}
-                    </span>
-                    {player.wins + player.losses + player.ties > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        {((player.wins / (player.wins + player.losses + player.ties)) * 100).toFixed(0)}%
-                      </div>
-                    )}
-                  </div>
+            {playersByTeam?.[activeTeam]?.map((player: Player) => (
+              <div key={player.id} className="py-3 flex justify-between items-center">
+                <span className="font-medium">{player.name}</span>
+                <div className="flex items-center space-x-3">
+                  <span className={`px-3 py-1 rounded-md text-white font-mono ${
+                    player.wins > player.losses 
+                      ? 'bg-green-600' 
+                      : player.losses > player.wins 
+                        ? 'bg-red-600' 
+                        : 'bg-gray-500'
+                  }`}>
+                    {player.wins}-{player.losses}-{player.ties}
+                  </span>
+                  {player.wins + player.losses + player.ties > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      {((player.wins / (player.wins + player.losses + player.ties)) * 100).toFixed(0)}%
+                    </div>
+                  )}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}

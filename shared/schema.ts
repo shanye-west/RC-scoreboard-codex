@@ -421,40 +421,29 @@ export type InsertPlayerCareerStat = z.infer<
 >;
 export type PlayerCareerStat = typeof player_career_stats.$inferSelect;
 
-// Player Matchups table - tracks individual matchup results between players
+// Player Matchups table - tracks head-to-head history between pairs of players
 export const player_matchups = pgTable(
   "player_matchups",
   {
     id: serial("id").primaryKey(),
-    playerId: integer("player_id").notNull(),
-    opponentId: integer("opponent_id").notNull(),
-    matchId: integer("match_id").notNull(),
-    tournamentId: integer("tournament_id"),
-    result: text("result").$type<'win' | 'loss' | 'tie'>(),
-    matchType: text("match_type").notNull(),
-    createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+    playerId1: integer("player_id_1").notNull(),
+    playerId2: integer("player_id_2").notNull(),
+    wins: integer("wins").default(0),
+    losses: integer("losses").default(0),
+    ties: integer("ties").default(0),
+    lastPlayed: timestamp("last_played", { mode: 'string' }).defaultNow(),
   },
   (table) => {
     return {
-      playerIdFk: foreignKey({
-        columns: [table.playerId],
+      playerId1Fk: foreignKey({
+        columns: [table.playerId1],
         foreignColumns: [players.id],
-        name: "player_matchups_player_id_fk",
+        name: "player_matchups_player_id_1_fk",
       }),
-      opponentIdFk: foreignKey({
-        columns: [table.opponentId],
+      playerId2Fk: foreignKey({
+        columns: [table.playerId2],
         foreignColumns: [players.id],
-        name: "player_matchups_opponent_id_fk",
-      }),
-      matchIdFk: foreignKey({
-        columns: [table.matchId],
-        foreignColumns: [matches.id],
-        name: "player_matchups_match_id_fk",
-      }),
-      tournamentIdFk: foreignKey({
-        columns: [table.tournamentId],
-        foreignColumns: [tournament.id],
-        name: "player_matchups_tournament_id_fk",
+        name: "player_matchups_player_id_2_fk",
       }),
     };
   },
