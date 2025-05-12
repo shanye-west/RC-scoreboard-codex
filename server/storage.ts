@@ -1233,7 +1233,7 @@ export class DBStorage implements IStorage {
   // Player matchup methods
   async createPlayerMatchup(data: InsertPlayerMatchup) {
     const [row] = await db.insert(player_matchups)
-      .values(data)
+      .values([data])
       .returning();
     return row;
   }

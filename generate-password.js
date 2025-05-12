@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+import crypto from 'crypto';
 const scrypt = crypto.scrypt;
 const randomBytes = crypto.randomBytes;
 const password = '1234';
