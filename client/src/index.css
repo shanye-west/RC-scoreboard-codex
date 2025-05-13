@@ -236,8 +236,25 @@ input[type="number"].score-input::-webkit-inner-spin-button {
   position: sticky;
   left: 0;
   z-index: 10;
-  background-color: inherit;
+  background-color: white;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1); /* Add shadow to sticky column */
+}
+
+/* Override for colored team rows */
+tr:has(td.bg-aviator) .sticky-column {
+  background-color: #00214D !important;
+}
+
+tr:has(td.bg-producer) .sticky-column {
+  background-color: #BF1238 !important;
+}
+
+tr:has(td.bg-gray-100) .sticky-column {
+  background-color: #f3f4f6 !important;
+}
+
+tr:has(td.bg-gray-50) .sticky-column {
+  background-color: #f9fafb !important;
 }
 
 /* Special styling for scorecard team rows */
