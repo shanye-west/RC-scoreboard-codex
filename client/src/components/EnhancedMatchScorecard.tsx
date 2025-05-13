@@ -138,6 +138,12 @@ const EnhancedMatchScorecard = ({
     enabled: !!matchData?.roundId && isBestBall,
   });
   
+  // Fetch existing player scores for this match
+  const { data: existingPlayerScores = [] } = useQuery<any[]>({
+    queryKey: [`/api/player-scores?matchId=${matchId}`],
+    enabled: !!matchId,
+  });
+  
   // Get authentication status to determine if user can edit scores
   const { isAdmin, user } = useAuth();
   
@@ -158,6 +164,42 @@ const EnhancedMatchScorecard = ({
   
   // Add queryClient for mutations
   const queryClient = useQueryClient();
+  
+  // Mutation for saving player scores
+  const savePlayerScoreMutation = useMutation({
+    mutationFn: async ({ 
+      playerId, 
+      matchId, 
+      holeNumber, 
+      score,
+      tournamentId
+    }: {
+      playerId: number;
+      matchId: number;
+      holeNumber: number;
+      score: number;
+      tournamentId?: number;
+    }) => {
+      // Check if player score already exists for this hole
+      const response = await apiRequest("POST", `/api/player-scores`, {
+        playerId,
+        matchId,
+        holeNumber,
+        score,
+        tournamentId
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to save player score");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
+    },
+  });
   
   // Mutation for updating a player's course handicap
   const updateHandicapMutation = useMutation({
@@ -721,6 +763,21 @@ const EnhancedMatchScorecard = ({
     newPlayerScores.set(playerKey, [playerScoreObj]);
 
     setPlayerScores(newPlayerScores);
+
+    // Persist the player score to the database if it's a valid score
+    if (playerId && numValue !== null) {
+      try {
+        savePlayerScoreMutation.mutate({
+          playerId,
+          matchId,
+          holeNumber,
+          score: numValue,
+          tournamentId: matchData?.tournamentId
+        });
+      } catch (error) {
+        console.error("Error saving player score:", error);
+      }
+    }
 
     // Calculate the best score for each team and update the match
     updateBestBallScores(holeNumber, newPlayerScores);
