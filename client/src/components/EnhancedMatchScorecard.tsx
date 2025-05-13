@@ -165,6 +165,8 @@ const EnhancedMatchScorecard = ({
   // Add queryClient for mutations
   const queryClient = useQueryClient();
   
+
+  
   // Mutation for saving player scores
   const savePlayerScoreMutation = useMutation({
     mutationFn: async ({ 
