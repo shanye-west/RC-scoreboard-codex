@@ -332,7 +332,7 @@ const EnhancedMatchScorecard = ({
     if (!Array.isArray(participants)) return [];
 
     return participants
-      .filter((p: any) => p.team === "aviators")
+      .filter((p: any) => p.team === "aviator" || p.team === "aviators")
       .map((p: any) => {
         if (!Array.isArray(allPlayers)) return { id: p.playerId, name: `Player ${p.playerId}`, teamId: 1 };
 
@@ -346,7 +346,7 @@ const EnhancedMatchScorecard = ({
     if (!Array.isArray(participants)) return [];
 
     return participants
-      .filter((p: any) => p.team === "producers")
+      .filter((p: any) => p.team === "producer" || p.team === "producers")
       .map((p: any) => {
         if (!Array.isArray(allPlayers)) return { id: p.playerId, name: `Player ${p.playerId}`, teamId: 2 };
 
@@ -365,6 +365,72 @@ const EnhancedMatchScorecard = ({
   const allHoles = [...holes].sort((a, b) => a.number - b.number);
   const frontNine = [...holes].filter((h) => h.number <= 9).sort((a, b) => a.number - b.number);
   const backNine = [...holes].filter((h) => h.number > 9).sort((a, b) => a.number - b.number);
+  
+  // Load saved player scores from the database
+  useEffect(() => {
+    if (!existingPlayerScores || existingPlayerScores.length === 0) return;
+    
+    console.log("Loading saved player scores from database:", existingPlayerScores);
+    
+    // Create a new Map to hold all loaded scores
+    const loadedScores = new Map(playerScores);
+    
+    // Process each saved player score
+    existingPlayerScores.forEach((savedScore: any) => {
+      const { playerId, holeNumber, score, handicapStrokes = 0 } = savedScore;
+      
+      // Find the player from our lists
+      const player = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === playerId);
+      if (!player) return;
+      
+      // Determine team ID - convert plural form to singular
+      const teamId = player.teamId === 1 ? "aviator" : "producer";
+      
+      // Calculate net score 
+      const netScore = score !== null ? score - handicapStrokes : null;
+      
+      // Create player score object
+      const playerScoreObj = {
+        player: player.name,
+        score,
+        teamId,
+        playerId,
+        handicapStrokes,
+        netScore
+      };
+      
+      // Set up the keys we use for storage
+      const teamKey = `${holeNumber}-${teamId}`;
+      const playerKey = `${holeNumber}-${player.name}`;
+      
+      // Get existing team scores or create new array
+      let teamScores = loadedScores.get(teamKey) || [];
+      
+      // Check if player already exists in team scores
+      const playerIndex = teamScores.findIndex(p => p.playerId === playerId);
+      
+      if (playerIndex >= 0) {
+        // Update existing player score
+        teamScores[playerIndex] = playerScoreObj;
+      } else {
+        // Add new player score
+        teamScores.push(playerScoreObj);
+      }
+      
+      // Update the maps with new scores
+      loadedScores.set(teamKey, teamScores);
+      loadedScores.set(playerKey, [playerScoreObj]);
+    });
+    
+    // Update state with loaded scores
+    setPlayerScores(loadedScores);
+    
+    // Calculate team scores based on loaded player scores
+    holes.forEach(hole => {
+      updateBestBallScores(hole.number, loadedScores);
+    });
+    
+  }, [existingPlayerScores, holes, playerScores, matchId, aviatorPlayersList, producerPlayersList]);
   
   // Load handicap strokes for all players on all holes
   useEffect(() => {
