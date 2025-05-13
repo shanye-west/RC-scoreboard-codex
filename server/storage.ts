@@ -20,6 +20,7 @@ import {
   player_matchups,
   player_match_type_stats,
   bets,
+  player_scores,
   InsertPlayerMatchup
 } from "@shared/schema";
 
@@ -82,6 +83,16 @@ export interface IStorage {
   updateScore(id: number, data: Partial<any>): Promise<any | undefined>;
   updateScoreAndMatch(id: number, data: Partial<any>): Promise<any>;
   createScoreAndMatch(data: any): Promise<any>;
+  
+  // Player Score methods
+  getPlayerScores(): Promise<any[]>;
+  getPlayerScore(playerId: number, matchId: number, holeNumber: number): Promise<any | undefined>;
+  getPlayerScoresByMatch(matchId: number): Promise<any[]>;
+  getPlayerScoresByPlayer(playerId: number): Promise<any[]>;
+  getPlayerScoresByPlayerAndMatch(playerId: number, matchId: number): Promise<any[]>;
+  createPlayerScore(data: any): Promise<any>;
+  updatePlayerScore(id: number, data: Partial<any>): Promise<any | undefined>;
+  deletePlayerScore(id: number): Promise<boolean>;
 
   // Tournament methods
   getTournament(): Promise<any | undefined>;

@@ -489,6 +489,43 @@ export const insertPlayerMatchTypeStatSchema = createInsertSchema(player_match_t
 export type InsertPlayerMatchTypeStat = z.infer<typeof insertPlayerMatchTypeStatSchema>;
 export type PlayerMatchTypeStat = typeof player_match_type_stats.$inferSelect;
 
+// Player Scores table - tracks individual player scores for each hole
+export const player_scores = pgTable(
+  "player_scores",
+  {
+    id: serial("id").primaryKey(),
+    playerId: integer("player_id").notNull(),
+    matchId: integer("match_id").notNull(),
+    holeNumber: integer("hole_number").notNull(),
+    score: integer("score").notNull(),
+    tournamentId: integer("tournament_id"),
+    createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+  },
+  (table) => {
+    return {
+      playerIdFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: "player_scores_player_id_fk",
+      }),
+      matchIdFk: foreignKey({
+        columns: [table.matchId],
+        foreignColumns: [matches.id],
+        name: "player_scores_match_id_fk",
+      }),
+      tournamentIdFk: foreignKey({
+        columns: [table.tournamentId],
+        foreignColumns: [tournament.id],
+        name: "player_scores_tournament_id_fk",
+      }),
+    };
+  },
+);
+export const insertPlayerScoreSchema = createInsertSchema(player_scores);
+export type InsertPlayerScore = z.infer<typeof insertPlayerScoreSchema>;
+export type PlayerScore = typeof player_scores.$inferSelect;
+
 // Bets table - for future sportsbook integration
 export const bets = pgTable(
   "bets",
