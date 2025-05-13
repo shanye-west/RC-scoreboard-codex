@@ -522,7 +522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const playerScoreId = parseInt(req.params.id);
       
       // Get the player score before deleting it to get the matchId for broadcasting
-      const playerScore = await storage.getPlayerScore(playerScoreId, 0, 0); // matchId and holeNumber aren't used when querying by ID
+      const playerScore = await storage.getPlayerScoreById(playerScoreId);
       
       if (!playerScore) {
         return res.status(404).json({ message: "Player score not found" });
