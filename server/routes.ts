@@ -411,6 +411,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(scores);
     }
   });
+  
+  // Player Scores API
+  app.get("/api/player-scores", async (req, res) => {
+    const matchId = req.query.matchId
+      ? parseInt(req.query.matchId as string)
+      : undefined;
+    const playerId = req.query.playerId
+      ? parseInt(req.query.playerId as string)
+      : undefined;
+
+    if (matchId && playerId) {
+      const scores = await storage.getPlayerScoresByPlayerAndMatch(playerId, matchId);
+      res.json(scores);
+    } else if (matchId) {
+      const scores = await storage.getPlayerScoresByMatch(matchId);
+      res.json(scores);
+    } else if (playerId) {
+      const scores = await storage.getPlayerScoresByPlayer(playerId);
+      res.json(scores);
+    } else {
+      const scores = await storage.getPlayerScores();
+      res.json(scores);
+    }
+  });
+
+  app.post("/api/player-scores", async (req, res) => {
+    try {
+      // Validate player score data
+      const schema = z.object({
+        playerId: z.number(),
+        matchId: z.number(),
+        holeNumber: z.number(),
+        score: z.number(),
+        tournamentId: z.number().optional(),
+      });
+      const playerScoreData = schema.parse(req.body);
+
+      // Check if player score already exists
+      const existingPlayerScore = await storage.getPlayerScore(
+        playerScoreData.playerId,
+        playerScoreData.matchId,
+        playerScoreData.holeNumber
+      );
+
+      let result;
+      if (existingPlayerScore) {
+        // Update existing score
+        result = await storage.updatePlayerScore(existingPlayerScore.id, playerScoreData);
+      } else {
+        // Create new score
+        result = await storage.createPlayerScore(playerScoreData);
+      }
+
+      // Broadcast player score update
+      broadcast("player-score-updated", result);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error processing player score:", error);
+      if (error instanceof z.ZodError) {
+        return res
+          .status(400)
+          .json({ message: "Invalid player score data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to save player score" });
+    }
+  });
+
+  app.put("/api/player-scores/:id", async (req, res) => {
+    try {
+      const playerScoreId = parseInt(req.params.id);
+      
+      // Validate player score data
+      const schema = z.object({
+        playerId: z.number().optional(),
+        matchId: z.number().optional(),
+        holeNumber: z.number().optional(),
+        score: z.number(),
+        tournamentId: z.number().optional(),
+      });
+      const playerScoreData = schema.parse(req.body);
+
+      // Update the player score
+      const updatedPlayerScore = await storage.updatePlayerScore(playerScoreId, playerScoreData);
+      
+      if (!updatedPlayerScore) {
+        return res.status(404).json({ message: "Player score not found" });
+      }
+
+      // Broadcast player score update
+      broadcast("player-score-updated", updatedPlayerScore);
+      
+      // Return all player scores for this match to ensure frontend has all data
+      const allPlayerScores = await storage.getPlayerScoresByMatch(updatedPlayerScore.matchId);
+      res.json(allPlayerScores);
+    } catch (error) {
+      console.error("Error updating player score:", error);
+      if (error instanceof z.ZodError) {
+        return res
+          .status(400)
+          .json({ message: "Invalid player score data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update player score" });
+    }
+  });
+  
+  app.delete("/api/player-scores/:id", async (req, res) => {
+    try {
+      const playerScoreId = parseInt(req.params.id);
+      
+      // Get the player score before deleting it to get the matchId for broadcasting
+      const playerScore = await storage.getPlayerScore(playerScoreId, 0, 0); // matchId and holeNumber aren't used when querying by ID
+      
+      if (!playerScore) {
+        return res.status(404).json({ message: "Player score not found" });
+      }
+      
+      const matchId = playerScore.matchId;
+      
+      // Delete the player score
+      const result = await storage.deletePlayerScore(playerScoreId);
+      
+      if (!result) {
+        return res.status(500).json({ message: "Failed to delete player score" });
+      }
+      
+      // Broadcast that the player score was deleted
+      broadcast("player-score-deleted", { id: playerScoreId, matchId });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting player score:", error);
+      res.status(500).json({ message: "Failed to delete player score" });
+    }
+  });
 
   app.post("/api/scores", async (req, res) => {
     try {

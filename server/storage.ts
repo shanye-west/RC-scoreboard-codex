@@ -87,6 +87,7 @@ export interface IStorage {
   // Player Score methods
   getPlayerScores(): Promise<any[]>;
   getPlayerScore(playerId: number, matchId: number, holeNumber: number): Promise<any | undefined>;
+  getPlayerScoreById(id: number): Promise<any | undefined>;
   getPlayerScoresByMatch(matchId: number): Promise<any[]>;
   getPlayerScoresByPlayer(playerId: number): Promise<any[]>;
   getPlayerScoresByPlayerAndMatch(playerId: number, matchId: number): Promise<any[]>;
@@ -829,6 +830,87 @@ export class DBStorage implements IStorage {
     await this.updateMatchState(newScore.matchId);
 
     return newScore;
+  }
+
+  // Player Score methods implementation
+  async getPlayerScores() {
+    return db.select().from(player_scores);
+  }
+
+  async getPlayerScore(playerId: number, matchId: number, holeNumber: number) {
+    const [row] = await db
+      .select()
+      .from(player_scores)
+      .where(
+        and(
+          eq(player_scores.playerId, playerId),
+          eq(player_scores.matchId, matchId),
+          eq(player_scores.holeNumber, holeNumber)
+        )
+      );
+    return row;
+  }
+  
+  async getPlayerScoreById(id: number) {
+    const [row] = await db
+      .select()
+      .from(player_scores)
+      .where(eq(player_scores.id, id));
+    return row;
+  }
+
+  async getPlayerScoresByMatch(matchId: number) {
+    return db
+      .select()
+      .from(player_scores)
+      .where(eq(player_scores.matchId, matchId));
+  }
+
+  async getPlayerScoresByPlayer(playerId: number) {
+    return db
+      .select()
+      .from(player_scores)
+      .where(eq(player_scores.playerId, playerId));
+  }
+
+  async getPlayerScoresByPlayerAndMatch(playerId: number, matchId: number) {
+    return db
+      .select()
+      .from(player_scores)
+      .where(
+        and(
+          eq(player_scores.playerId, playerId),
+          eq(player_scores.matchId, matchId)
+        )
+      )
+      .orderBy(player_scores.holeNumber);
+  }
+
+  async createPlayerScore(data: any) {
+    const [row] = await db.insert(player_scores).values(data).returning();
+    return row;
+  }
+
+  async updatePlayerScore(id: number, data: Partial<any>) {
+    const [row] = await db
+      .update(player_scores)
+      .set({
+        ...data,
+        updatedAt: new Date().toISOString()
+      })
+      .where(eq(player_scores.id, id))
+      .returning();
+    return row;
+  }
+
+  async deletePlayerScore(id: number) {
+    try {
+      await db.delete(player_scores).where(eq(player_scores.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting player score:", error);
+      return false;
+    }
   }
 
   // Tournament
