@@ -20,53 +20,44 @@ const Home = () => {
   const [tournamentFormData, setTournamentFormData] = useState({
     name: ""
   });
-  
-  // State for courses
-  const [courses, setCourses] = useState<any[]>([]);
-  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
-  
+
+  // Define the Course interface
+  interface Course {
+    id: number;
+    name: string;
+    location: string;
+  }
+
+  // Fetch courses using react-query
+  const { data: courses = [], isLoading: isLoadingCourses } = useQuery<Course[]>({
+    queryKey: ['/api/courses'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/courses');
+      return response.json();
+    }
+  });
+
+  useEffect(() => {
+    // If we have courses, set the default courseId and courseName
+    if (courses.length > 0) {
+      setRoundFormData(prev => ({
+        ...prev,
+        courseId: courses[0].id,
+        courseName: courses[0].name
+      }));
+    }
+  }, [courses]);
+
   const [roundFormData, setRoundFormData] = useState({
     name: "",
     matchType: "Singles Match",
-    courseId: 1, // Default value that will be updated when courses are loaded
-    courseName: "",
+    courseId: courses.length > 0 ? courses[0].id : 1, // Default value that will be updated when courses are loaded
+    courseName: courses.length > 0 ? courses[0].name : "",
     date: new Date().toISOString().split('T')[0],
     startTime: "08:00",
     isComplete: false,
     tournamentId: 1 // Default tournament ID
   });
-  
-  // Fetch courses on component mount
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        console.log("Fetching courses for Home page");
-        const response = await fetch('/api/courses');
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Home page got courses:", data);
-          setCourses(data);
-          
-          // If we have courses, set the default courseId and courseName
-          if (data.length > 0) {
-            setRoundFormData(prev => ({
-              ...prev,
-              courseId: data[0].id,
-              courseName: data[0].name
-            }));
-          }
-        } else {
-          console.error("Error fetching courses:", response.status);
-        }
-      } catch (error) {
-        console.error("Failed to fetch courses:", error);
-      } finally {
-        setIsLoadingCourses(false);
-      }
-    };
-
-    fetchCourses();
-  }, []);
 
   // Define types
   interface Tournament {
@@ -106,7 +97,7 @@ const Home = () => {
   const updateTournamentMutation = useMutation({
     mutationFn: async (tournamentData: any) => {
       const { aviatorScore, producerScore, ...safeData } = tournamentData;
-      
+
       const res = await apiRequest("PUT", `/api/tournament/${tournament?.id}`, safeData);
       return await res.json();
     },
@@ -180,7 +171,7 @@ const Home = () => {
 
   const handleRoundFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation for course selection
     if (!roundFormData.courseId || isNaN(Number(roundFormData.courseId))) {
       toast({
@@ -190,13 +181,13 @@ const Home = () => {
       });
       return;
     }
-    
+
     // Ensure courseId is properly cast to a number
     const formData = {
       ...roundFormData,
       courseId: Number(roundFormData.courseId)
     };
-    
+
     console.log('Submitting round with data:', formData);
     addRoundMutation.mutate(formData);
   };
@@ -206,7 +197,7 @@ const Home = () => {
     // Default to the first course if courses are loaded
     const defaultCourseId = courses && courses.length > 0 ? courses[0].id : 1;
     const defaultCourseName = courses && courses.length > 0 ? courses[0].name : "";
-    
+
     setRoundFormData({
       name: "",
       matchType: "Singles Match",
@@ -230,7 +221,7 @@ const Home = () => {
   };
 
   const isLoading = isTournamentLoading || isRoundsLoading;
-  
+
   // Process rounds data to include scores
   const roundsWithScores = rounds?.map((round: Round) => {
     // Get scores for this round from matches
@@ -238,7 +229,7 @@ const Home = () => {
     const producerScore = round.producerScore || 0;
     const pendingAviatorScore = round.pendingAviatorScore || 0;
     const pendingProducerScore = round.pendingProducerScore || 0;
-    
+
     return {
       ...round,
       aviatorScore,
@@ -285,7 +276,7 @@ const Home = () => {
               </Button>
             </div>
           )}
-          
+
           {/* Tournament Score */}
           <TournamentScore 
             aviatorScore={tournament?.aviatorScore || 0} 
@@ -293,7 +284,7 @@ const Home = () => {
             pendingAviatorScore={tournament?.pendingAviatorScore || 0}
             pendingProducerScore={tournament?.pendingProducerScore || 0}
           />
-          
+
           {/* Rounds List */}
           <div className="mt-6">
             {isAdmin && (
@@ -303,13 +294,13 @@ const Home = () => {
             )}
             <RoundsList rounds={roundsWithScores || []} />
           </div>
-          
+
           {/* Tournament Settings Dialog */}
           {isTournamentDialogOpen && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-background rounded-lg shadow-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
                 <h2 className="text-xl font-bold mb-4">Edit Tournament</h2>
-                
+
                 <form onSubmit={handleTournamentFormSubmit}>
                   <div className="space-y-4">
                     <div>
@@ -325,10 +316,10 @@ const Home = () => {
                         required
                       />
                     </div>
-                    
+
 
                   </div>
-                  
+
                   <div className="flex justify-end mt-6 space-x-2">
                     <Button
                       type="button"
@@ -355,13 +346,13 @@ const Home = () => {
               </div>
             </div>
           )}
-          
+
           {/* Add Round Dialog */}
           {isAddRoundDialogOpen && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
               <div className="bg-background rounded-lg shadow-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
                 <h2 className="text-xl font-bold mb-4">Add New Round</h2>
-                
+
                 <form onSubmit={handleRoundFormSubmit}>
                   <div className="space-y-4">
                     <div>
@@ -377,7 +368,7 @@ const Home = () => {
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium mb-1">
                         Match Type
@@ -397,12 +388,12 @@ const Home = () => {
                         <option value="Alternate Shot">Alternate Shot</option>
                       </select>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium mb-1">
                         Course
                       </label>
-                      
+
                       {isLoadingCourses ? (
                         <div className="p-2 border rounded">Loading courses...</div>
                       ) : courses && courses.length > 0 ? (
@@ -435,7 +426,7 @@ const Home = () => {
                           No courses available. Please add courses first.
                         </div>
                       )}
-                      
+
                       {/* Debug information */}
                       {isAdmin && (
                         <div className="text-xs mt-1 bg-gray-100 p-2 rounded">
@@ -444,7 +435,7 @@ const Home = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium mb-1">
@@ -459,7 +450,7 @@ const Home = () => {
                           required
                         />
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium mb-1">
                           Start Time
@@ -475,7 +466,7 @@ const Home = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex justify-end mt-6 space-x-2">
                     <Button
                       type="button"
