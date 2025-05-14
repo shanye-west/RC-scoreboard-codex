@@ -757,26 +757,52 @@ const EnhancedMatchScorecard = ({
       handicapStrokes: number;
       netScore: number | null;
     }) => {
-      const response = await fetch('/api/best-ball-scores', {
+      // Save to best_ball_player_scores table
+      const bestBallResponse = await fetch('/api/best-ball-scores', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(score),
       });
-      if (!response.ok) {
-        throw new Error('Failed to save score');
+      
+      if (!bestBallResponse.ok) {
+        throw new Error('Failed to save best ball score');
       }
-      return response.json();
+      
+      // Also save to player_scores table for consistency if score is not null
+      if (score.score !== null) {
+        try {
+          await apiRequest("POST", `/api/player-scores`, {
+            playerId: score.playerId,
+            matchId: score.matchId,
+            holeNumber: score.holeNumber,
+            score: score.score,
+            tournamentId: matchData?.tournamentId
+          });
+        } catch (error) {
+          console.error("Failed to save to player_scores table:", error);
+          // Continue execution - don't fail the whole operation
+        }
+      }
+      
+      return bestBallResponse.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
+    },
+    onError: (error) => {
+      console.error('Error saving score:', error);
+      // Notify user of error
+      alert('Failed to save score. Please try again.');
     },
   });
 
   // Load individual scores into state when they're fetched
   useEffect(() => {
-    if (individualScores.length > 0) {
+    if (Array.isArray(individualScores) && individualScores.length > 0) {
+      console.log("Loading scores from best_ball_player_scores table:", individualScores.length, "scores found");
       const newPlayerScores = new Map();
       
       individualScores.forEach(score => {
@@ -792,8 +818,8 @@ const EnhancedMatchScorecard = ({
             score: score.score,
             teamId: player.teamId === 1 ? 'aviator' : 'producer',
             playerId: score.playerId,
-            handicapStrokes: score.handicapStrokes,
-            netScore: score.netScore
+            handicapStrokes: score.handicapStrokes || 0,
+            netScore: score.netScore || (score.score !== null ? score.score - (score.handicapStrokes || 0) : null)
           };
           
           // Update team scores
