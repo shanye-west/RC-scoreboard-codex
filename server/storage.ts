@@ -21,7 +21,10 @@ import {
   player_match_type_stats,
   bets,
   player_scores,
-  InsertPlayerMatchup
+  best_ball_player_scores,
+  InsertPlayerMatchup,
+  InsertBestBallScore,
+  BestBallScore
 } from "@shared/schema";
 
 export interface IStorage {
@@ -1329,7 +1332,14 @@ export class DBStorage implements IStorage {
   }
   
   // Player matchup methods
-  async createPlayerMatchup(data: InsertPlayerMatchup) {
+  async createPlayerMatchup(data: any) {
+    // Make sure the result is one of the allowed values
+    if (data.result && typeof data.result === 'string') {
+      data.result = data.result === 'win' ? 'win' : 
+                   data.result === 'loss' ? 'loss' : 
+                   data.result === 'tie' ? 'tie' : null;
+    }
+    
     const [row] = await db.insert(player_matchups)
       .values([data])
       .returning();

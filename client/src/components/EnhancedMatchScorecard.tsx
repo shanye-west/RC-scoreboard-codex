@@ -835,6 +835,71 @@ const EnhancedMatchScorecard = ({
       setPlayerScores(newPlayerScores);
     }
   }, [individualScores, aviatorPlayersList, producerPlayersList]);
+  
+  // Fallback mechanism to load scores from player_scores if best_ball_scores aren't available
+  useEffect(() => {
+    // Only run if best ball match, we have existing player scores, and we don't have individual scores
+    if (isBestBall && 
+        Array.isArray(existingPlayerScores) && existingPlayerScores.length > 0 && 
+        (!Array.isArray(individualScores) || individualScores.length === 0)) {
+      console.log("Fallback: Loading scores from player_scores table:", existingPlayerScores.length, "scores found");
+      const newPlayerScores = new Map();
+      
+      existingPlayerScores.forEach((score: any) => {
+        const player = [...aviatorPlayersList, ...producerPlayersList]
+          .find(p => p.id === score.playerId);
+        
+        if (player) {
+          const teamKey = `${score.holeNumber}-${player.teamId === 1 ? 'aviator' : 'producer'}`;
+          const playerKey = `${score.holeNumber}-${player.name}`;
+          
+          // Calculate handicap strokes based on player's course handicap
+          const courseHandicap = getPlayerCourseHandicap(score.playerId);
+          const hole = holes.find(h => h.number === score.holeNumber);
+          const handicapRank = hole?.handicapRank || 0;
+          
+          let handicapStrokes = 0;
+          if (handicapRank > 0 && courseHandicap >= handicapRank) {
+            handicapStrokes = 1;
+            if (handicapRank === 1 && courseHandicap >= 19) {
+              handicapStrokes = 2;
+            }
+          }
+          
+          const netScore = score.score !== null ? score.score - handicapStrokes : null;
+          
+          const scoreObj = {
+            player: player.name,
+            score: score.score,
+            teamId: player.teamId === 1 ? 'aviator' : 'producer',
+            playerId: score.playerId,
+            handicapStrokes: handicapStrokes,
+            netScore: netScore
+          };
+          
+          // Update team scores
+          const teamScores = newPlayerScores.get(teamKey) || [];
+          teamScores.push(scoreObj);
+          newPlayerScores.set(teamKey, teamScores);
+          
+          // Add individual player score
+          newPlayerScores.set(playerKey, [scoreObj]);
+        }
+      });
+      
+      // Only update if we have scores and the main useEffect hasn't populated scores yet
+      if (newPlayerScores.size > 0 && playerScores.size === 0) {
+        setPlayerScores(newPlayerScores);
+        
+        // Also update best ball scores for each hole
+        const uniqueHoles = [...new Set(existingPlayerScores.map((s: any) => s.holeNumber))];
+        uniqueHoles.forEach(holeNumber => {
+          updateBestBallScores(holeNumber, newPlayerScores);
+        });
+      }
+    }
+  }, [existingPlayerScores, individualScores, aviatorPlayersList, producerPlayersList, isBestBall, 
+      holes, playerScores, getPlayerCourseHandicap, updateBestBallScores]);
 
   // Update handlePlayerScoreChange to use the mutation
   const handlePlayerScoreChange = async (
@@ -875,15 +940,37 @@ const EnhancedMatchScorecard = ({
     
     const netScore = numValue !== null ? numValue - handicapStrokes : null;
 
-    // Save to database
-    await saveScoreMutation.mutateAsync({
-      matchId,
-      playerId,
-      holeNumber,
-      score: numValue,
-      handicapStrokes,
-      netScore
-    });
+    // Save to database with error handling
+    try {
+      await saveScoreMutation.mutateAsync({
+        matchId,
+        playerId,
+        holeNumber,
+        score: numValue,
+        handicapStrokes,
+        netScore
+      });
+      
+      // Also save to player_scores table for redundancy
+      if (numValue !== null) {
+        try {
+          await savePlayerScoreMutation.mutate({
+            playerId,
+            matchId,
+            holeNumber,
+            score: numValue,
+            tournamentId: matchData?.tournamentId
+          });
+        } catch (error) {
+          console.error("Error saving to player_scores:", error);
+          // Don't block the UI flow if this fails
+        }
+      }
+    } catch (error) {
+      console.error("Error saving score:", error);
+      alert("Failed to save your score. Please try again.");
+      // Continue with local state update anyway to maintain user experience
+    }
 
     // Update local state
     const teamKey = `${holeNumber}-${teamId}`;
