@@ -60,19 +60,15 @@ const Teams = () => {
   if (playersByTeam) {
     Object.keys(playersByTeam).forEach(teamId => {
       playersByTeam[Number(teamId)].sort((a, b) => {
-        const aPercentage = calculateWinPercentage(a);
-        const bPercentage = calculateWinPercentage(b);
+        // Calculate total points (wins = 1, ties = 0.5)
+        const aPoints = a.wins + (a.ties * 0.5);
+        const bPoints = b.wins + (b.ties * 0.5);
         
-        if (bPercentage !== aPercentage) {
-          return bPercentage - aPercentage;
+        if (bPoints !== aPoints) {
+          return bPoints - aPoints;
         }
         
-        // If percentages are equal, sort by number of wins
-        if (b.wins !== a.wins) {
-          return b.wins - a.wins;
-        }
-        
-        // If wins are equal, sort alphabetically
+        // If points are equal, sort alphabetically
         return a.name.localeCompare(b.name);
       });
     });

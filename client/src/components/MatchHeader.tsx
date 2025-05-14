@@ -129,7 +129,7 @@ const MatchHeader = ({
             <div className="flex justify-center items-center">
               <div className="text-center py-2 px-4 rounded-lg font-heading font-bold bg-gray-100 text-lg">
                 <span className={leadingTeam === "aviators" ? "text-aviator" : "text-producer"}>
-                  {leadingTeam === "aviators" ? "Aviators" : "Producers"} win {result}
+                  {leadingTeam === "aviators" ? "Aviators" : "Producers"} win {result ? result.replace(" UP", `&${18 - currentHole}`) : ""}
                 </span>
               </div>
             </div>
