@@ -20,7 +20,8 @@ import {
   player_matchups,
   player_match_type_stats,
   bets,
-  InsertPlayerMatchup
+  InsertPlayerMatchup,
+  best_ball_player_scores
 } from "@shared/schema";
 
 export interface IStorage {
@@ -149,6 +150,11 @@ export interface IStorage {
   getAllPlayerCourseHandicaps(roundId: number): Promise<any[]>;
   
   initializeData(): Promise<void>;
+
+  // Best Ball Score methods
+  saveBestBallScore(score: InsertBestBallScore): Promise<any>;
+  getBestBallScores(matchId: number): Promise<any[]>;
+  deleteBestBallScore(matchId: number, playerId: number, holeNumber: number): Promise<any>;
 }
 
 export class DBStorage implements IStorage {
@@ -1846,6 +1852,61 @@ export class DBStorage implements IStorage {
       console.error("Error getting all player course handicaps:", error);
       return [];
     }
+  }
+
+  // Best Ball Score methods
+  async saveBestBallScore(score: InsertBestBallScore) {
+    const existingScore = await db
+      .select()
+      .from(best_ball_player_scores)
+      .where(
+        and(
+          eq(best_ball_player_scores.matchId, score.matchId),
+          eq(best_ball_player_scores.playerId, score.playerId),
+          eq(best_ball_player_scores.holeNumber, score.holeNumber)
+        )
+      )
+      .limit(1);
+
+    if (existingScore.length > 0) {
+      // Update existing score
+      return db
+        .update(best_ball_player_scores)
+        .set({
+          score: score.score,
+          handicapStrokes: score.handicapStrokes,
+          netScore: score.netScore,
+          updatedAt: new Date().toISOString()
+        })
+        .where(eq(best_ball_player_scores.id, existingScore[0].id))
+        .returning();
+    } else {
+      // Insert new score
+      return db
+        .insert(best_ball_player_scores)
+        .values(score)
+        .returning();
+    }
+  }
+
+  async getBestBallScores(matchId: number) {
+    return db
+      .select()
+      .from(best_ball_player_scores)
+      .where(eq(best_ball_player_scores.matchId, matchId))
+      .orderBy(best_ball_player_scores.holeNumber);
+  }
+
+  async deleteBestBallScore(matchId: number, playerId: number, holeNumber: number) {
+    return db
+      .delete(best_ball_player_scores)
+      .where(
+        and(
+          eq(best_ball_player_scores.matchId, matchId),
+          eq(best_ball_player_scores.playerId, playerId),
+          eq(best_ball_player_scores.holeNumber, holeNumber)
+        )
+      );
   }
 }
 
