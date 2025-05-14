@@ -706,6 +706,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Best Ball Score API
+  app.post('/api/best-ball-scores', async (req, res) => {
+    try {
+      const score = insertBestBallScoreSchema.parse(req.body);
+      const result = await storage.saveBestBallScore(score);
+      
+      // Broadcast the update
+      broadcast("best-ball-score-updated", result[0]);
+      
+      res.json(result[0]);
+    } catch (error) {
+      console.error('Error saving best ball score:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid score data', details: error.errors });
+      }
+      res.status(500).json({ error: 'Failed to save score' });
+    }
+  });
+
+  app.get('/api/best-ball-scores/:matchId', async (req, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      if (isNaN(matchId)) {
+        return res.status(400).json({ error: 'Invalid match ID' });
+      }
+      const scores = await storage.getBestBallScores(matchId);
+      res.json(scores);
+    } catch (error) {
+      console.error('Error fetching best ball scores:', error);
+      res.status(500).json({ error: 'Failed to fetch scores' });
+    }
+  });
+
+  app.delete('/api/best-ball-scores/:matchId/:playerId/:holeNumber', async (req, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      const playerId = parseInt(req.params.playerId);
+      const holeNumber = parseInt(req.params.holeNumber);
+      
+      if (isNaN(matchId) || isNaN(playerId) || isNaN(holeNumber)) {
+        return res.status(400).json({ error: 'Invalid parameters' });
+      }
+      
+      await storage.deleteBestBallScore(matchId, playerId, holeNumber);
+      
+      // Broadcast the deletion
+      broadcast("best-ball-score-deleted", { matchId, playerId, holeNumber });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting best ball score:', error);
+      res.status(500).json({ error: 'Failed to delete score' });
+    }
+  });
+
   // ADMIN ROUTES - Protected by isAdmin middleware
 
   // Create a new admin user (special endpoint - only for initial admin setup)
@@ -1476,50 +1531,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating tournament history:", error);
       res.status(500).json({ error: "Failed to update tournament history" });
-    }
-  });
-
-  // Best Ball Score routes
-  app.post('/api/best-ball-scores', async (req, res) => {
-    try {
-      const score = insertBestBallScoreSchema.parse(req.body);
-      const result = await storage.saveBestBallScore(score);
-      res.json(result[0]);
-    } catch (error) {
-      console.error('Error saving best ball score:', error);
-      res.status(400).json({ error: 'Invalid score data' });
-    }
-  });
-
-  app.get('/api/best-ball-scores/:matchId', async (req, res) => {
-    try {
-      const matchId = parseInt(req.params.matchId);
-      if (isNaN(matchId)) {
-        return res.status(400).json({ error: 'Invalid match ID' });
-      }
-      const scores = await storage.getBestBallScores(matchId);
-      res.json(scores);
-    } catch (error) {
-      console.error('Error fetching best ball scores:', error);
-      res.status(500).json({ error: 'Failed to fetch scores' });
-    }
-  });
-
-  app.delete('/api/best-ball-scores/:matchId/:playerId/:holeNumber', async (req, res) => {
-    try {
-      const matchId = parseInt(req.params.matchId);
-      const playerId = parseInt(req.params.playerId);
-      const holeNumber = parseInt(req.params.holeNumber);
-      
-      if (isNaN(matchId) || isNaN(playerId) || isNaN(holeNumber)) {
-        return res.status(400).json({ error: 'Invalid parameters' });
-      }
-      
-      await storage.deleteBestBallScore(matchId, playerId, holeNumber);
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting best ball score:', error);
-      res.status(500).json({ error: 'Failed to delete score' });
     }
   });
 
