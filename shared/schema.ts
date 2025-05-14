@@ -558,3 +558,46 @@ export const bets = pgTable(
 export const insertBetSchema = createInsertSchema(bets);
 export type InsertBet = z.infer<typeof insertBetSchema>;
 export type Bet = typeof bets.$inferSelect;
+
+// Best Ball Player Scores table
+export const best_ball_player_scores = pgTable(
+  "best_ball_player_scores",
+  {
+    id: serial("id").primaryKey(),
+    matchId: integer("match_id").notNull(),
+    playerId: integer("player_id").notNull(),
+    holeNumber: integer("hole_number").notNull(),
+    score: integer("score"),
+    handicapStrokes: integer("handicap_strokes").default(0),
+    netScore: integer("net_score"),
+    createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+  },
+  (table) => {
+    return {
+      matchIdFk: foreignKey({
+        columns: [table.matchId],
+        foreignColumns: [matches.id],
+        name: "best_ball_scores_match_id_fk",
+      }),
+      playerIdFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: "best_ball_scores_player_id_fk",
+      }),
+    };
+  },
+);
+
+// Create schema for inserting best ball scores
+export const insertBestBallScoreSchema = z.object({
+  matchId: z.number(),
+  playerId: z.number(),
+  holeNumber: z.number(),
+  score: z.number().nullable(),
+  handicapStrokes: z.number().default(0),
+  netScore: z.number().nullable(),
+});
+
+export type InsertBestBallScore = z.infer<typeof insertBestBallScoreSchema>;
+export type BestBallScore = typeof best_ball_player_scores.$inferSelect;

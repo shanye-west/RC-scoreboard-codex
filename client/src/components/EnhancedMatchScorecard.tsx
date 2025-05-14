@@ -74,6 +74,7 @@ const EnhancedMatchScorecard = ({
   onBestBallScoreUpdate,
 }: MatchScorecardProps) => {
   const isBestBall = matchType.includes("Best Ball");
+  const queryClient = useQueryClient();
 
   // Fetch match participants
   const { data: participants = [] } = useQuery<any[]>({
@@ -88,6 +89,12 @@ const EnhancedMatchScorecard = ({
   // Fetch information about the match's round
   const { data: matchData } = useQuery<any>({
     queryKey: [`/api/matches/${matchId}`],
+    enabled: !!matchId && isBestBall,
+  });
+  
+  // Fetch individual player scores for Best Ball
+  const { data: individualScores = [] } = useQuery({
+    queryKey: [`/api/best-ball-scores/${matchId}`],
     enabled: !!matchId && isBestBall,
   });
   
@@ -741,7 +748,70 @@ const EnhancedMatchScorecard = ({
     }, 100);
   };
 
-  // Handle individual player score changes for Best Ball
+  // Mutation for saving individual scores
+  const saveScoreMutation = useMutation({
+    mutationFn: async (score: {
+      matchId: number;
+      playerId: number;
+      holeNumber: number;
+      score: number | null;
+      handicapStrokes: number;
+      netScore: number | null;
+    }) => {
+      const response = await fetch('/api/best-ball-scores', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(score),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to save score');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
+    },
+  });
+
+  // Load individual scores into state when they're fetched
+  useEffect(() => {
+    if (individualScores.length > 0) {
+      const newPlayerScores = new Map();
+      
+      individualScores.forEach(score => {
+        const player = [...aviatorPlayersList, ...producerPlayersList]
+          .find(p => p.id === score.playerId);
+        
+        if (player) {
+          const teamKey = `${score.holeNumber}-${player.teamId === 1 ? 'aviator' : 'producer'}`;
+          const playerKey = `${score.holeNumber}-${player.name}`;
+          
+          const scoreObj = {
+            player: player.name,
+            score: score.score,
+            teamId: player.teamId === 1 ? 'aviator' : 'producer',
+            playerId: score.playerId,
+            handicapStrokes: score.handicapStrokes,
+            netScore: score.netScore
+          };
+          
+          // Update team scores
+          const teamScores = newPlayerScores.get(teamKey) || [];
+          teamScores.push(scoreObj);
+          newPlayerScores.set(teamKey, teamScores);
+          
+          // Update player-specific scores
+          newPlayerScores.set(playerKey, [scoreObj]);
+        }
+      });
+      
+      setPlayerScores(newPlayerScores);
+    }
+  }, [individualScores, aviatorPlayersList, producerPlayersList]);
+
+  // Update handlePlayerScoreChange to use the mutation
   const handlePlayerScoreChange = async (
     holeNumber: number,
     playerName: string,
@@ -749,63 +819,55 @@ const EnhancedMatchScorecard = ({
     value: string,
     target: HTMLInputElement,
   ) => {
-    // Check if user has permission to edit scores
     if (!canEditScores) {
       console.log("User doesn't have permission to update scores");
       return;
     }
     
     let numValue = null;
-
-    // Only parse if the value is not empty
     if (value !== "") {
-      // Ensure we're parsing a valid number
       const parsed = parseInt(value);
       if (!isNaN(parsed)) {
         numValue = parsed;
       }
     }
 
-    // Store the player score using both keys for redundancy
-    // First key is for the team calculations
-    const teamKey = `${holeNumber}-${teamId}`;
-    // Second key is for looking up individual player scores
-    const playerKey = `${holeNumber}-${playerName}`;
-
-    let holeScores = playerScores.get(teamKey) || [];
-
-    // Find the player in the current hole scores
-    const playerIndex = holeScores.findIndex((ps) => ps.player === playerName);
-    
     const playerId = teamId === "aviator"
       ? aviatorPlayersList.find((p: any) => p.name === playerName)?.id || 0
       : producerPlayersList.find((p: any) => p.name === playerName)?.id || 0;
     
-    // Get player's course handicap
     const courseHandicap = getPlayerCourseHandicap(playerId);
-    
-    // Find the hole with the matching number to get handicap rank
     const hole = holes.find(h => h.number === holeNumber);
     const handicapRank = hole?.handicapRank || 0;
     
-    // Calculate handicap strokes for this player on this hole
     let handicapStrokes = 0;
-    
-    // If player's handicap is higher than or equal to the hole's handicap rank, they get a stroke
     if (isBestBall && handicapRank > 0 && courseHandicap >= handicapRank) {
       handicapStrokes = 1;
-      
-      // Additional strokes for very high handicaps
       if (handicapRank === 1 && courseHandicap >= 19) {
         handicapStrokes = 2;
       }
     }
     
-    // Calculate net score if applicable
-    let netScore = numValue !== null ? numValue - handicapStrokes : null;
+    const netScore = numValue !== null ? numValue - handicapStrokes : null;
+
+    // Save to database
+    await saveScoreMutation.mutateAsync({
+      matchId,
+      playerId,
+      holeNumber,
+      score: numValue,
+      handicapStrokes,
+      netScore
+    });
+
+    // Update local state
+    const teamKey = `${holeNumber}-${teamId}`;
+    const playerKey = `${holeNumber}-${playerName}`;
+
+    let holeScores = playerScores.get(teamKey) || [];
+    const playerIndex = holeScores.findIndex((ps) => ps.player === playerName);
     
-    // Create a player score object
-    const playerScoreObj: BestBallPlayerScore = {
+    const playerScoreObj = {
       player: playerName,
       score: numValue,
       teamId,
@@ -815,22 +877,17 @@ const EnhancedMatchScorecard = ({
     };
 
     if (playerIndex >= 0) {
-      // Update existing player score
-      holeScores[playerIndex].score = numValue;
-      holeScores[playerIndex].handicapStrokes = handicapStrokes;
-      holeScores[playerIndex].netScore = netScore;
+      holeScores[playerIndex] = playerScoreObj;
     } else {
-      // Add new player score
       holeScores.push(playerScoreObj);
     }
 
-    // Update state with both keys
     const newPlayerScores = new Map(playerScores);
     newPlayerScores.set(teamKey, holeScores);
-    // Also set the player-specific key for direct lookup
     newPlayerScores.set(playerKey, [playerScoreObj]);
 
     setPlayerScores(newPlayerScores);
+<<<<<<< HEAD
 
     // Persist the player score to the database if it's a valid score
     if (playerId && numValue !== null) {
@@ -848,9 +905,10 @@ const EnhancedMatchScorecard = ({
     }
 
     // Calculate the best score for each team and update the match
+=======
+>>>>>>> cd10b89fe70bd4e36084a76ddd356e67615b37f4
     updateBestBallScores(holeNumber, newPlayerScores);
 
-    //Added Keyboard Closing Logic
     setTimeout(() => {
       if (value !== "1" && value !== "") {
         target.blur();
