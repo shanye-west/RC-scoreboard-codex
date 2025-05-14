@@ -169,8 +169,7 @@ const EnhancedMatchScorecard = ({
   // Determine if user can edit scores (is admin or participant)
   const canEditScores = isAdmin || isParticipant;
   
-  // Add queryClient for mutations
-  const queryClient = useQueryClient();
+  // queryClient is already defined above
   
 
   
@@ -887,7 +886,6 @@ const EnhancedMatchScorecard = ({
     newPlayerScores.set(playerKey, [playerScoreObj]);
 
     setPlayerScores(newPlayerScores);
-<<<<<<< HEAD
 
     // Persist the player score to the database if it's a valid score
     if (playerId && numValue !== null) {
@@ -905,8 +903,6 @@ const EnhancedMatchScorecard = ({
     }
 
     // Calculate the best score for each team and update the match
-=======
->>>>>>> cd10b89fe70bd4e36084a76ddd356e67615b37f4
     updateBestBallScores(holeNumber, newPlayerScores);
 
     setTimeout(() => {

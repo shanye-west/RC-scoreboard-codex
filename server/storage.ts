@@ -20,13 +20,8 @@ import {
   player_matchups,
   player_match_type_stats,
   bets,
-<<<<<<< HEAD
   player_scores,
   InsertPlayerMatchup
-=======
-  InsertPlayerMatchup,
-  best_ball_player_scores
->>>>>>> cd10b89fe70bd4e36084a76ddd356e67615b37f4
 } from "@shared/schema";
 
 export interface IStorage {
