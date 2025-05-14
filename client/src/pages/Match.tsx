@@ -621,7 +621,9 @@ const Match = ({ id }: { id: number }) => {
                         : "Match"}{" "}
                     {matchSummary.matchPlayResult !== "AS" ? "won" : "tied"}{" "}
                     <span className="font-bold">
-                      {matchSummary.matchPlayResult}
+                      {matchSummary.matchPlayResult !== "AS" ? 
+                        `${matchSummary.matchPlayResult.split(" ")[0]}&${18 - match.currentHole}` : 
+                        matchSummary.matchPlayResult}
                     </span>
                   </p>
                 </div>

@@ -200,7 +200,7 @@
             <div className="text-center py-1 px-3 rounded-lg font-heading font-bold bg-gray-100">
               {leadingTeam}
               <span className="text-sm font-mono bg-white px-2 py-1 rounded ml-1">
-                {match.leadAmount > 0 ? `${match.leadAmount} UP` : "-"}
+                {match.leadAmount > 0 ? `${match.leadAmount}&${18 - (match.currentHole || 1)}` : "-"}
               </span>
             </div>
             <div className="text-xs text-gray-500 ml-2">
