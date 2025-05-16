@@ -2058,6 +2058,290 @@ export class DBStorage implements IStorage {
         )
       );
   }
+
+  // Sportsbook methods - Bet Types
+  async getBetTypes(): Promise<BetType[]> {
+    return db.select().from(bet_types);
+  }
+
+  async getBetType(id: number): Promise<BetType | undefined> {
+    const [betType] = await db.select().from(bet_types).where(eq(bet_types.id, id));
+    return betType;
+  }
+
+  async getBetTypeByName(name: string): Promise<BetType | undefined> {
+    const [betType] = await db.select().from(bet_types).where(eq(bet_types.name, name));
+    return betType;
+  }
+
+  async createBetType(data: InsertBetType): Promise<BetType> {
+    const [betType] = await db.insert(bet_types).values(data).returning();
+    return betType;
+  }
+
+  async updateBetType(id: number, data: Partial<BetType>): Promise<BetType | undefined> {
+    const [betType] = await db
+      .update(bet_types)
+      .set(data)
+      .where(eq(bet_types.id, id))
+      .returning();
+    return betType;
+  }
+
+  // Sportsbook methods - Bets
+  async getBets(): Promise<Bet[]> {
+    return db.select().from(bets);
+  }
+
+  async getUserBets(userId: number): Promise<Bet[]> {
+    return db.select().from(bets).where(eq(bets.userId, userId));
+  }
+
+  async getBet(id: number): Promise<Bet | undefined> {
+    const [bet] = await db.select().from(bets).where(eq(bets.id, id));
+    return bet;
+  }
+
+  async getBetsByMatch(matchId: number): Promise<Bet[]> {
+    return db.select().from(bets).where(eq(bets.matchId, matchId));
+  }
+
+  async getBetsByRound(roundId: number): Promise<Bet[]> {
+    return db.select().from(bets).where(eq(bets.roundId, roundId));
+  }
+
+  async getBetsByPlayer(playerId: number): Promise<Bet[]> {
+    return db.select().from(bets).where(eq(bets.playerId, playerId));
+  }
+
+  async getBetsByStatus(status: string): Promise<Bet[]> {
+    return db.select().from(bets).where(eq(bets.status, status));
+  }
+
+  async createBet(data: InsertBet): Promise<Bet> {
+    const [bet] = await db.insert(bets).values(data).returning();
+    
+    // If this is a bet against another user, create a ledger entry
+    if (data.userId && data.amount) {
+      // For now, we're assuming bets are placed against user ID 1 (admin/house)
+      // In a real implementation, this would be more sophisticated
+      await db.insert(betting_ledger).values({
+        creditorId: data.userId,
+        debtorId: 1, // Admin or house account
+        amount: data.amount,
+        betId: bet.id,
+      });
+    }
+    
+    return bet;
+  }
+
+  async updateBet(id: number, data: Partial<Bet>): Promise<Bet | undefined> {
+    const [bet] = await db
+      .update(bets)
+      .set(data)
+      .where(eq(bets.id, id))
+      .returning();
+    return bet;
+  }
+
+  async settleBet(id: number, status: string, actualResult: string, settledBy: number): Promise<Bet> {
+    // Start transaction for bet settlement
+    return db.transaction(async (tx) => {
+      // Get the current bet
+      const [currentBet] = await tx.select().from(bets).where(eq(bets.id, id));
+      
+      if (!currentBet) {
+        throw new Error(`Bet with ID ${id} not found`);
+      }
+      
+      // Update the bet
+      const [updatedBet] = await tx
+        .update(bets)
+        .set({
+          status: status,
+          actualResult: actualResult,
+          settledAt: new Date().toISOString(),
+        })
+        .where(eq(bets.id, id))
+        .returning();
+      
+      // Record the settlement
+      await tx.insert(bet_settlements).values({
+        betId: id,
+        previousStatus: currentBet.status,
+        newStatus: status,
+        settledBy: settledBy,
+        reason: `Bet settled with actual result: ${actualResult}`,
+        payout: status === 'won' ? currentBet.potentialPayout : 0,
+      });
+      
+      // Update the ledger based on the outcome
+      if (status === 'won' && currentBet.userId) {
+        // Get existing ledger entry
+        const [ledgerEntry] = await tx
+          .select()
+          .from(betting_ledger)
+          .where(eq(betting_ledger.betId, id));
+        
+        if (ledgerEntry) {
+          // Update the ledger entry to reflect the winnings
+          await tx
+            .update(betting_ledger)
+            .set({
+              amount: currentBet.potentialPayout,
+              status: 'pending',
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(betting_ledger.id, ledgerEntry.id));
+        }
+      } else if (status === 'lost' && currentBet.userId) {
+        // If bet is lost, remove the ledger entry or mark as settled
+        await tx
+          .update(betting_ledger)
+          .set({
+            status: 'paid', // Bet is lost, so it's settled
+            settledAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(betting_ledger.betId, id));
+      }
+      
+      return updatedBet;
+    });
+  }
+
+  // Sportsbook methods - Parlays
+  async getParlays(): Promise<Parlay[]> {
+    return db.select().from(parlays);
+  }
+
+  async getUserParlays(userId: number): Promise<Parlay[]> {
+    return db.select().from(parlays).where(eq(parlays.userId, userId));
+  }
+
+  async getParlay(id: number): Promise<Parlay | undefined> {
+    const [parlay] = await db.select().from(parlays).where(eq(parlays.id, id));
+    return parlay;
+  }
+
+  async createParlay(data: InsertParlay, betIds: number[]): Promise<Parlay> {
+    // Create the parlay in a transaction to ensure consistency
+    return db.transaction(async (tx) => {
+      // Create the parlay
+      const [parlay] = await tx.insert(parlays).values(data).returning();
+      
+      // Update all the associated bets to link them to this parlay
+      if (betIds.length > 0) {
+        for (const betId of betIds) {
+          await tx
+            .update(bets)
+            .set({
+              isParlay: true,
+              parlayId: parlay.id,
+            })
+            .where(eq(bets.id, betId));
+        }
+      }
+      
+      return parlay;
+    });
+  }
+
+  async updateParlay(id: number, data: Partial<Parlay>): Promise<Parlay | undefined> {
+    const [parlay] = await db
+      .update(parlays)
+      .set(data)
+      .where(eq(parlays.id, id))
+      .returning();
+    return parlay;
+  }
+
+  // Sportsbook methods - Ledger
+  async getLedgerEntries(): Promise<LedgerEntry[]> {
+    return db.select().from(betting_ledger);
+  }
+
+  async getUserLedgerEntries(userId: number): Promise<LedgerEntry[]> {
+    return db
+      .select()
+      .from(betting_ledger)
+      .where(
+        or(
+          eq(betting_ledger.creditorId, userId),
+          eq(betting_ledger.debtorId, userId)
+        )
+      );
+  }
+
+  async getLedgerEntriesBetweenUsers(user1Id: number, user2Id: number): Promise<LedgerEntry[]> {
+    return db
+      .select()
+      .from(betting_ledger)
+      .where(
+        or(
+          and(
+            eq(betting_ledger.creditorId, user1Id),
+            eq(betting_ledger.debtorId, user2Id)
+          ),
+          and(
+            eq(betting_ledger.creditorId, user2Id),
+            eq(betting_ledger.debtorId, user1Id)
+          )
+        )
+      );
+  }
+
+  async createLedgerEntry(data: InsertLedgerEntry): Promise<LedgerEntry> {
+    const [entry] = await db.insert(betting_ledger).values(data).returning();
+    return entry;
+  }
+
+  async updateLedgerEntry(id: number, data: Partial<LedgerEntry>): Promise<LedgerEntry | undefined> {
+    const [entry] = await db
+      .update(betting_ledger)
+      .set(data)
+      .where(eq(betting_ledger.id, id))
+      .returning();
+    return entry;
+  }
+
+  async getUserBalance(userId: number): Promise<{ owed: number, owing: number, net: number }> {
+    // Calculate how much the user is owed (as creditor)
+    const [creditorResult] = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(${betting_ledger.amount}), 0)`,
+      })
+      .from(betting_ledger)
+      .where(
+        and(
+          eq(betting_ledger.creditorId, userId),
+          eq(betting_ledger.status, 'pending')
+        )
+      );
+    
+    // Calculate how much the user owes (as debtor)
+    const [debtorResult] = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(${betting_ledger.amount}), 0)`,
+      })
+      .from(betting_ledger)
+      .where(
+        and(
+          eq(betting_ledger.debtorId, userId),
+          eq(betting_ledger.status, 'pending')
+        )
+      );
+    
+    const owed = creditorResult?.total || 0;
+    const owing = debtorResult?.total || 0;
+    
+    return {
+      owed,
+      owing,
+      net: owed - owing,
+    };
+  }
 }
 
 export const storage = new DBStorage();

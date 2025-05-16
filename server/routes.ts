@@ -11,6 +11,10 @@ import {
   insertPlayerSchema,
   User,
   insertBestBallScoreSchema,
+  insertBetSchema,
+  insertBetTypeSchema,
+  insertParlaySchema,
+  insertLedgerEntrySchema,
 } from "@shared/schema";
 import { setupAuth, isAuthenticated, isAdmin, hashPassword } from "./auth";
 
@@ -49,6 +53,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication
   setupAuth(app);
+  
+  // Initialize default bet types
+  const initializeBetTypes = async () => {
+    try {
+      // Define the default bet types we want to ensure exist
+      const defaultBetTypes = [
+        {
+          name: 'match_winner',
+          description: 'Bet on which team wins a specific match',
+          isActive: true,
+        },
+        {
+          name: 'player_prop',
+          description: 'Bet on whether a specific player will win, tie, or lose their match',
+          isActive: true,
+        },
+        {
+          name: 'round_winner',
+          description: 'Bet on which team wins the most matches in a given round',
+          isActive: true,
+        },
+        {
+          name: 'over_under',
+          description: 'Bet on whether a statistic will be over or under a specified value',
+          isActive: true,
+        },
+        {
+          name: 'parlay',
+          description: 'Combine multiple bets for higher risk/reward',
+          isActive: true,
+        },
+      ];
+      
+      // For each default bet type, check if it exists and create if not
+      for (const betType of defaultBetTypes) {
+        const existingType = await storage.getBetTypeByName(betType.name);
+        if (!existingType) {
+          await storage.createBetType(betType);
+          console.log(`Created bet type: ${betType.name}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error initializing bet types:", error);
+    }
+  };
+  
+  // Call the initialization function when the server starts
+  initializeBetTypes();
   
   // Initialize the application data - can be called to repair data
   app.get("/api/initialize", async (req, res) => {
