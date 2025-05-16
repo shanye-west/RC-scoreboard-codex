@@ -894,6 +894,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Best Ball Score API with synchronized score updates
+  // Add a savePlayerScore helper for routes.ts
+  const savePlayerScore = async (data) => {
+    const existingScore = await storage.getPlayerScore(
+      data.playerId,
+      data.matchId,
+      data.holeNumber
+    );
+
+    if (existingScore) {
+      return storage.updatePlayerScore(existingScore.id, data);
+    } else {
+      return storage.createPlayerScore(data);
+    }
+  };
+
   app.post('/api/best-ball-scores', async (req, res) => {
     try {
       const score = insertBestBallScoreSchema.parse(req.body);
@@ -904,7 +919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Step 2: Ensure player_scores is also updated for consistency
       if (score.score !== null) {
         try {
-          await storage.savePlayerScore({
+          await savePlayerScore({
             playerId: score.playerId,
             matchId: score.matchId,
             holeNumber: score.holeNumber,
