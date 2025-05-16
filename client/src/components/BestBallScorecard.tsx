@@ -502,15 +502,22 @@ const BestBallScorecard = ({
     const matchScore = scores.find(s => s.holeNumber === hole.number);
     const isHoleLoading = loadingHoles.has(hole.number);
     
-    // Find the current winning team for this hole
-    const winningTeam = matchScore?.winningTeam || 
-      (matchScore?.aviatorScore !== null && matchScore?.producerScore !== null
-        ? matchScore.aviatorScore < matchScore.producerScore 
-          ? 'aviator' 
-          : matchScore.producerScore < matchScore.aviatorScore 
-            ? 'producer' 
-            : 'tie'
-        : null);
+    // Find the current winning team for this hole - safely handle undefined scores
+    let winningTeam = null;
+    
+    if (matchScore) {
+      if (matchScore.winningTeam) {
+        winningTeam = matchScore.winningTeam;
+      } else if (matchScore.aviatorScore !== null && matchScore.producerScore !== null) {
+        if (matchScore.aviatorScore < matchScore.producerScore) {
+          winningTeam = 'aviator';
+        } else if (matchScore.producerScore < matchScore.aviatorScore) {
+          winningTeam = 'producer';
+        } else {
+          winningTeam = 'tie';
+        }
+      }
+    }
     
     return (
       <div 
@@ -587,7 +594,7 @@ const BestBallScorecard = ({
           <div className="border-t border-blue-300 pt-1 mt-2 flex items-center justify-between">
             <span className="font-medium">Best Score:</span>
             <span className="font-bold">
-              {matchScore?.aviatorScore !== null ? matchScore.aviatorScore : '-'}
+              {matchScore && matchScore.aviatorScore !== null ? matchScore.aviatorScore : '-'}
             </span>
           </div>
         </div>
