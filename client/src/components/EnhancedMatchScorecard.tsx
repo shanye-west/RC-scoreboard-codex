@@ -1056,20 +1056,8 @@ const EnhancedMatchScorecard = ({
 
     setPlayerScores(newPlayerScores);
 
-    // Persist the player score to the database if it's a valid score
-    if (playerId && numValue !== null) {
-      try {
-        savePlayerScoreMutation.mutate({
-          playerId,
-          matchId,
-          holeNumber,
-          score: numValue,
-          tournamentId: matchData?.tournamentId
-        });
-      } catch (error) {
-        console.error("Error saving player score:", error);
-      }
-    }
+    // This duplicate call is redundant and can be removed - we already saved to 
+    // player_scores table above. Keeping this would cause double-saves.
 
     // Calculate the best score for each team and update the match
     updateBestBallScores(holeNumber, newPlayerScores);
