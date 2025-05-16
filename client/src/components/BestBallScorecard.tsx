@@ -1,26 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
-import { Player, Hole, BestBallPlayerScore } from '../types';
+import { toast } from 'react-hot-toast';
+import { Button } from './ui/button';
+import { Player, Hole, BestBallPlayerScore, MatchParticipant } from '../types';
 
 interface BestBallScorecardProps {
   matchId: number;
   roundId: number;
   holes: Hole[];
-  participants: any[];
+  participants: MatchParticipant[];
   allPlayers: Player[];
-  isAdmin?: boolean;
-}
-
-interface TeamScore {
-  player: string;
-  playerId: number;
-  score: number;
-  handicapStrokes: number;
-  netScore: number;
+  isAdmin: boolean;
 }
 
 const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
@@ -29,238 +21,414 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
   holes,
   participants,
   allPlayers,
-  isAdmin = false,
+  isAdmin
 }) => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [playerScores, setPlayerScores] = useState<Map<string, TeamScore[]>>(new Map());
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [playerScores, setPlayerScores] = useState<Map<string, BestBallPlayerScore[]>>(new Map());
+  const [handicapStrokes, setHandicapStrokes] = useState<Map<string, number>>(new Map());
 
-  // Get aviator and producer players
-  const aviatorPlayersList = useMemo(() => {
-    if (!Array.isArray(participants)) return [];
-    return participants
-      .filter((p: { team: string }) => p.team === "aviator" || p.team === "aviators")
-      .map((p: { playerId: number }) => {
-        const playerDetails = allPlayers.find((player: Player) => player.id === p.playerId);
-        return playerDetails || { id: p.playerId, name: `Player ${p.playerId}`, teamId: 1 };
-      });
-  }, [participants, allPlayers]);
+  // Fetch player handicaps
+  const { data: playerHandicaps = [] } = useQuery({
+    queryKey: [`/api/round-handicaps/${roundId}`],
+    enabled: !!roundId
+  });
 
-  const producerPlayersList = useMemo(() => {
-    if (!Array.isArray(participants)) return [];
-    return participants
-      .filter((p: { team: string }) => p.team === "producer" || p.team === "producers")
-      .map((p: { playerId: number }) => {
-        const playerDetails = allPlayers.find((player: Player) => player.id === p.playerId);
-        return playerDetails || { id: p.playerId, name: `Player ${p.playerId}`, teamId: 2 };
-      });
-  }, [participants, allPlayers]);
-
-  // Fetch individual scores
-  const { data: individualScores, isLoading: isLoadingScores } = useQuery({
+  // Fetch existing scores
+  const { data: existingScores = [] } = useQuery({
     queryKey: [`/api/best-ball-scores/${matchId}`],
-    queryFn: async () => {
+    enabled: !!matchId
+  });
+
+  // Mutation for saving scores
+  const saveScoreMutation = useMutation({
+    mutationFn: async (score: {
+      matchId: number;
+      playerId: number;
+      holeNumber: number;
+      score: number | null;
+      handicapStrokes: number;
+      netScore: number | null;
+    }) => {
       const { data, error } = await supabase
         .from('best_ball_player_scores')
-        .select('*')
-        .eq('matchId', matchId);
+        .upsert({
+          match_id: score.matchId,
+          player_id: score.playerId,
+          hole_number: score.holeNumber,
+          score: score.score,
+          handicap_strokes: score.handicapStrokes,
+          net_score: score.netScore
+        });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!matchId,
-  });
-
-  // Initialize scores when data is loaded
-  useEffect(() => {
-    if (isInitialized || !individualScores || !holes.length) return;
-
-    const newPlayerScores = new Map<string, TeamScore[]>();
-    
-    individualScores.forEach((score: any) => {
-      const player = [...aviatorPlayersList, ...producerPlayersList]
-        .find((p: Player) => p.id === score.playerId);
-      
-      if (player) {
-        const teamKey = `${score.holeNumber}-${player.teamId === 1 ? "aviator" : "producer"}`;
-        const teamScores = newPlayerScores.get(teamKey) || [];
-        
-        teamScores.push({
-          player: player.name,
-          playerId: player.id,
-          score: score.score,
-          handicapStrokes: score.handicapStrokes || 0,
-          netScore: score.score - (score.handicapStrokes || 0)
-        });
-        
-        newPlayerScores.set(teamKey, teamScores);
-      }
-    });
-
-    setPlayerScores(newPlayerScores);
-    setIsInitialized(true);
-  }, [individualScores, holes, aviatorPlayersList, producerPlayersList, isInitialized]);
-
-  // Save score mutation
-  const saveScoreMutation = useMutation({
-    mutationFn: async (data: {
-      matchId: number;
-      holeNumber: number;
-      playerId: number;
-      score: number;
-      handicapStrokes: number;
-    }) => {
-      const { error } = await supabase
-        .from('best_ball_player_scores')
-        .upsert({
-          matchId: data.matchId,
-          holeNumber: data.holeNumber,
-          playerId: data.playerId,
-          score: data.score,
-          handicapStrokes: data.handicapStrokes,
-          updatedAt: new Date().toISOString()
-        });
-
-      if (error) throw error;
-    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
-    },
+    }
   });
 
+  // Calculate handicap strokes for a player on a specific hole
+  const calculateHandicapStrokes = (playerId: number, holeNumber: number): number => {
+    const player = allPlayers.find(p => p.id === playerId);
+    if (!player?.handicapIndex) return 0;
+
+    const hole = holes.find(h => h.number === holeNumber);
+    if (!hole?.handicapRank) return 0;
+
+    const courseHandicap = Math.round(player.handicapIndex * 1.15); // Example slope rating
+    let strokes = 0;
+
+    if (courseHandicap >= hole.handicapRank) {
+      strokes = 1;
+      if (hole.handicapRank === 1 && courseHandicap >= 19) {
+        strokes = 2;
+      }
+    }
+
+    return strokes;
+  };
+
+  // Load existing scores
+  useEffect(() => {
+    if (!existingScores.length) return;
+
+    const newScores = new Map<string, BestBallPlayerScore[]>();
+    existingScores.forEach((score: any) => {
+      const key = `${score.hole_number}-${score.player_id}`;
+      const player = allPlayers.find(p => p.id === score.player_id);
+      if (!player) return;
+
+      newScores.set(key, [{
+        player: player.name,
+        score: score.score,
+        teamId: player.teamId === 1 ? 'aviator' : 'producer',
+        playerId: score.player_id,
+        handicapStrokes: score.handicap_strokes,
+        netScore: score.net_score
+      }]);
+    });
+
+    setPlayerScores(newScores);
+  }, [existingScores, allPlayers]);
+
+  // Handle score change
   const handleScoreChange = async (
     holeNumber: number,
     playerId: number,
-    score: number,
-    handicapStrokes: number
+    value: string
   ) => {
-    if (!isAdmin) return;
+    const player = allPlayers.find(p => p.id === playerId);
+    if (!player) return;
 
-    setIsSaving(true);
+    let numValue: number | null = null;
+    if (value !== '') {
+      const parsed = parseInt(value);
+      if (!isNaN(parsed)) {
+        numValue = parsed;
+      }
+    }
+
+    const strokes = calculateHandicapStrokes(playerId, holeNumber);
+    const netScore = numValue !== null ? numValue - strokes : null;
+
     try {
       await saveScoreMutation.mutateAsync({
         matchId,
-        holeNumber,
         playerId,
-        score,
-        handicapStrokes
+        holeNumber,
+        score: numValue,
+        handicapStrokes: strokes,
+        netScore
       });
+
+      // Update local state
+      const key = `${holeNumber}-${playerId}`;
+      const newScores = new Map(playerScores);
+      newScores.set(key, [{
+        player: player.name,
+        score: numValue,
+        teamId: player.teamId === 1 ? 'aviator' : 'producer',
+        playerId,
+        handicapStrokes: strokes,
+        netScore
+      }]);
+      setPlayerScores(newScores);
+
+      toast.success('Score saved successfully');
     } catch (error) {
       console.error('Error saving score:', error);
       toast.error('Failed to save score');
-    } finally {
-      setIsSaving(false);
     }
   };
 
-  // Calculate team totals
-  const calculateTeamTotals = (teamId: number) => {
-    let total = 0;
-    let netTotal = 0;
-    
+  // Calculate team scores
+  const teamScores = useMemo(() => {
+    const scores = new Map<string, number>();
+    const aviatorScores = new Map<number, number>();
+    const producerScores = new Map<number, number>();
+
+    // Calculate best scores for each team on each hole
     holes.forEach(hole => {
-      const teamKey = `${hole.number}-${teamId === 1 ? "aviator" : "producer"}`;
-      const scores = playerScores.get(teamKey) || [];
-      
-      if (scores.length > 0) {
-        const bestScore = Math.min(...scores.map(s => s.score));
-        const bestNetScore = Math.min(...scores.map(s => s.netScore));
-        total += bestScore;
-        netTotal += bestNetScore;
-      }
+      let aviatorBest = Infinity;
+      let producerBest = Infinity;
+
+      Array.from(playerScores.entries()).forEach(([key, scores]) => {
+        const [holeNum, playerId] = key.split('-');
+        if (parseInt(holeNum) !== hole.number) return;
+
+        const player = allPlayers.find(p => p.id === parseInt(playerId));
+        if (!player) return;
+
+        const score = scores[0]?.score;
+        if (score === null || score === undefined) return;
+
+        if (player.teamId === 1) {
+          aviatorBest = Math.min(aviatorBest, score);
+        } else {
+          producerBest = Math.min(producerBest, score);
+        }
+      });
+
+      if (aviatorBest !== Infinity) aviatorScores.set(hole.number, aviatorBest);
+      if (producerBest !== Infinity) producerScores.set(hole.number, producerBest);
     });
-    
-    return { total, netTotal };
-  };
 
-  const aviatorTotals = calculateTeamTotals(1);
-  const producerTotals = calculateTeamTotals(2);
+    // Calculate totals
+    let aviatorTotal = 0;
+    let producerTotal = 0;
 
-  if (isLoadingScores) {
-    return <div>Loading scores...</div>;
-  }
+    aviatorScores.forEach(score => aviatorTotal += score);
+    producerScores.forEach(score => producerTotal += score);
 
+    scores.set('aviator', aviatorTotal);
+    scores.set('producer', producerTotal);
+
+    return scores;
+  }, [playerScores, holes, allPlayers]);
+
+  // Render the scorecard
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full bg-white border border-gray-200">
+      <table className="w-full text-sm scorecard-table">
         <thead>
           <tr className="bg-gray-100">
-            <th className="px-4 py-2 border">Hole</th>
-            <th className="px-4 py-2 border">Par</th>
-            <th className="px-4 py-2 border">Aviators</th>
-            <th className="px-4 py-2 border">Producers</th>
+            <th className="py-2 px-2 text-left font-semibold sticky-column">Hole</th>
+            {holes.map(hole => (
+              <th key={hole.number} className="py-2 px-2 text-center font-semibold">
+                {hole.number}
+              </th>
+            ))}
+            <th className="py-2 px-2 text-center font-semibold bg-gray-200">Total</th>
+          </tr>
+          <tr className="bg-gray-50">
+            <th className="py-2 px-2 text-left font-semibold sticky-column">Par</th>
+            {holes.map(hole => (
+              <td key={hole.number} className="py-2 px-2 text-center">
+                {hole.par}
+                {hole.handicapRank && (
+                  <span className="ml-1 text-xs text-blue-600">
+                    ({hole.handicapRank})
+                  </span>
+                )}
+              </td>
+            ))}
+            <td className="py-2 px-2 text-center font-semibold bg-gray-100">
+              {holes.reduce((sum, hole) => sum + hole.par, 0)}
+            </td>
           </tr>
         </thead>
         <tbody>
-          {holes.map((hole) => {
-            const aviatorKey = `${hole.number}-aviator`;
-            const producerKey = `${hole.number}-producer`;
-            const aviatorScores = playerScores.get(aviatorKey) || [];
-            const producerScores = playerScores.get(producerKey) || [];
+          {/* Aviator Players */}
+          {participants
+            .filter(p => p.team === 'aviator')
+            .map(participant => {
+              const player = allPlayers.find(p => p.id === participant.playerId);
+              if (!player) return null;
 
-            return (
-              <tr key={hole.number}>
-                <td className="px-4 py-2 border text-center">{hole.number}</td>
-                <td className="px-4 py-2 border text-center">{hole.par}</td>
-                <td className="px-4 py-2 border">
-                  {aviatorScores.map((score, index) => (
-                    <div key={index} className="flex items-center justify-between mb-1">
-                      <span>{score.player}:</span>
-                      <input
-                        type="number"
-                        value={score.score}
-                        onChange={(e) => handleScoreChange(
-                          hole.number,
-                          score.playerId,
-                          parseInt(e.target.value) || 0,
-                          score.handicapStrokes
-                        )}
-                        disabled={!isAdmin || isSaving}
-                        className="w-16 px-2 py-1 border rounded"
-                      />
+              return (
+                <tr key={player.id} className="border-b border-gray-200">
+                  <td className="py-2 px-2 sticky-column bg-white border-l-4 border-aviator">
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs font-medium text-black leading-tight">
+                        <div className="font-semibold">{player.name}</div>
+                        <div className="text-blue-600">
+                          HCP: {player.handicapIndex || 0}
+                        </div>
+                      </div>
                     </div>
-                  ))}
-                  <div className="text-sm text-gray-600">
-                    Best: {Math.min(...aviatorScores.map(s => s.score), 99)}
+                  </td>
+                  {holes.map(hole => {
+                    const key = `${hole.number}-${player.id}`;
+                    const scores = playerScores.get(key);
+                    const score = scores?.[0]?.score;
+                    const strokes = scores?.[0]?.handicapStrokes || 0;
+
+                    return (
+                      <td key={hole.number} className="py-2 px-2 text-center">
+                        <div className="relative">
+                          {strokes > 0 && (
+                            <div className="handicap-strokes">
+                              {Array.from({ length: strokes }).map((_, i) => (
+                                <div key={i} className="handicap-indicator" />
+                              ))}
+                            </div>
+                          )}
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            className={`score-input w-8 h-8 text-center border border-gray-300 rounded
+                              ${strokes > 0 ? 'handicap-stroke' : ''}`}
+                            value={score?.toString() || ''}
+                            onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value)}
+                            min="1"
+                            max="12"
+                            disabled={!isAdmin}
+                          />
+                          {score !== null && strokes > 0 && (
+                            <span className="net-score">
+                              ({score - strokes})
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="py-2 px-2 text-center font-semibold bg-gray-100">
+                    {Array.from(playerScores.entries())
+                      .filter(([key]) => key.endsWith(`-${player.id}`))
+                      .reduce((sum, [_, scores]) => sum + (scores[0]?.score || 0), 0)}
+                  </td>
+                </tr>
+              );
+            })}
+
+          {/* Aviator Team Total */}
+          <tr className="border-b border-gray-200">
+            <td className="py-2 px-2 font-semibold sticky-column bg-aviator text-white">
+              Aviators
+            </td>
+            {holes.map(hole => {
+              const aviatorScores = Array.from(playerScores.entries())
+                .filter(([key, scores]) => {
+                  const [holeNum, playerId] = key.split('-');
+                  const player = allPlayers.find(p => p.id === parseInt(playerId));
+                  return parseInt(holeNum) === hole.number && player?.teamId === 1;
+                })
+                .map(([_, scores]) => scores[0]?.score)
+                .filter((score): score is number => score !== null && score !== undefined);
+
+              const bestScore = aviatorScores.length > 0 ? Math.min(...aviatorScores) : null;
+
+              return (
+                <td key={hole.number} className="py-2 px-2 text-center">
+                  <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded
+                    ${bestScore ? 'bg-aviator text-white' : 'bg-white text-black'}`}>
+                    {bestScore || ''}
                   </div>
                 </td>
-                <td className="px-4 py-2 border">
-                  {producerScores.map((score, index) => (
-                    <div key={index} className="flex items-center justify-between mb-1">
-                      <span>{score.player}:</span>
-                      <input
-                        type="number"
-                        value={score.score}
-                        onChange={(e) => handleScoreChange(
-                          hole.number,
-                          score.playerId,
-                          parseInt(e.target.value) || 0,
-                          score.handicapStrokes
-                        )}
-                        disabled={!isAdmin || isSaving}
-                        className="w-16 px-2 py-1 border rounded"
-                      />
-                    </div>
-                  ))}
-                  <div className="text-sm text-gray-600">
-                    Best: {Math.min(...producerScores.map(s => s.score), 99)}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-          <tr className="bg-gray-50 font-bold">
-            <td colSpan={2} className="px-4 py-2 border text-right">Total:</td>
-            <td className="px-4 py-2 border text-center">{aviatorTotals.total}</td>
-            <td className="px-4 py-2 border text-center">{producerTotals.total}</td>
+              );
+            })}
+            <td className="py-2 px-2 text-center font-semibold bg-gray-200 text-aviator">
+              {teamScores.get('aviator') || ''}
+            </td>
           </tr>
-          <tr className="bg-gray-50 font-bold">
-            <td colSpan={2} className="px-4 py-2 border text-right">Net Total:</td>
-            <td className="px-4 py-2 border text-center">{aviatorTotals.netTotal}</td>
-            <td className="px-4 py-2 border text-center">{producerTotals.netTotal}</td>
+
+          {/* Producer Players */}
+          {participants
+            .filter(p => p.team === 'producer')
+            .map(participant => {
+              const player = allPlayers.find(p => p.id === participant.playerId);
+              if (!player) return null;
+
+              return (
+                <tr key={player.id} className="border-b border-gray-200">
+                  <td className="py-2 px-2 sticky-column bg-white border-l-4 border-producer">
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs font-medium text-black leading-tight">
+                        <div className="font-semibold">{player.name}</div>
+                        <div className="text-blue-600">
+                          HCP: {player.handicapIndex || 0}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  {holes.map(hole => {
+                    const key = `${hole.number}-${player.id}`;
+                    const scores = playerScores.get(key);
+                    const score = scores?.[0]?.score;
+                    const strokes = scores?.[0]?.handicapStrokes || 0;
+
+                    return (
+                      <td key={hole.number} className="py-2 px-2 text-center">
+                        <div className="relative">
+                          {strokes > 0 && (
+                            <div className="handicap-strokes">
+                              {Array.from({ length: strokes }).map((_, i) => (
+                                <div key={i} className="handicap-indicator" />
+                              ))}
+                            </div>
+                          )}
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            className={`score-input w-8 h-8 text-center border border-gray-300 rounded
+                              ${strokes > 0 ? 'handicap-stroke' : ''}`}
+                            value={score?.toString() || ''}
+                            onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value)}
+                            min="1"
+                            max="12"
+                            disabled={!isAdmin}
+                          />
+                          {score !== null && strokes > 0 && (
+                            <span className="net-score">
+                              ({score - strokes})
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="py-2 px-2 text-center font-semibold bg-gray-100">
+                    {Array.from(playerScores.entries())
+                      .filter(([key]) => key.endsWith(`-${player.id}`))
+                      .reduce((sum, [_, scores]) => sum + (scores[0]?.score || 0), 0)}
+                  </td>
+                </tr>
+              );
+            })}
+
+          {/* Producer Team Total */}
+          <tr className="border-b border-gray-200">
+            <td className="py-2 px-2 font-semibold sticky-column bg-producer text-white">
+              Producers
+            </td>
+            {holes.map(hole => {
+              const producerScores = Array.from(playerScores.entries())
+                .filter(([key, scores]) => {
+                  const [holeNum, playerId] = key.split('-');
+                  const player = allPlayers.find(p => p.id === parseInt(playerId));
+                  return parseInt(holeNum) === hole.number && player?.teamId === 2;
+                })
+                .map(([_, scores]) => scores[0]?.score)
+                .filter((score): score is number => score !== null && score !== undefined);
+
+              const bestScore = producerScores.length > 0 ? Math.min(...producerScores) : null;
+
+              return (
+                <td key={hole.number} className="py-2 px-2 text-center">
+                  <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded
+                    ${bestScore ? 'bg-producer text-white' : 'bg-white text-black'}`}>
+                    {bestScore || ''}
+                  </div>
+                </td>
+              );
+            })}
+            <td className="py-2 px-2 text-center font-semibold bg-gray-200 text-producer">
+              {teamScores.get('producer') || ''}
+            </td>
           </tr>
         </tbody>
       </table>

@@ -17,6 +17,7 @@ import {
   getHandicapStrokesFromStorage,
   calculateHandicapStrokes
 } from "@/lib/handicapUtils";
+import BestBallScorecard from './BestBallScorecard';
 
 // DEFINE INTERFACES
 interface Hole {
@@ -1499,8 +1500,23 @@ const EnhancedMatchScorecard = ({
     return safeGetHandicapStrokes(playerScores.get(key)) > 0;
   };
 
+  // If this is a best ball match, use the dedicated BestBallScorecard component
+  if (isBestBall) {
+    return (
+      <BestBallScorecard
+        matchId={matchId}
+        roundId={matchData?.roundId || 0}
+        holes={holes}
+        participants={participants || []}
+        allPlayers={allPlayers}
+        isAdmin={isAdmin}
+      />
+    );
+  }
+
+  // Regular match play scoring continues below
   return (
-    <div className="scorecard-container">
+    <div className="overflow-x-auto">
       <div>
         {/* All 18 Holes in a single table with horizontal scrolling */}
         <table className="w-full text-sm scorecard-table">
