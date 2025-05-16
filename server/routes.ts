@@ -1721,5 +1721,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sportsbook API endpoints
+  
+  // Bet Types API
+  app.get('/api/bet-types', async (req, res) => {
+    try {
+      const betTypes = await storage.getBetTypes();
+      res.json(betTypes);
+    } catch (error) {
+      console.error("Error getting bet types:", error);
+      res.status(500).json({ message: "Failed to get bet types" });
+    }
+  });
+
+  app.post('/api/bet-types', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const data = insertBetTypeSchema.parse(req.body);
+      const result = await storage.createBetType(data);
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating bet type:", error);
+      res.status(500).json({ message: "Failed to create bet type" });
+    }
+  });
+
+  // Bets API
+  app.get('/api/bets', isAuthenticated, async (req, res) => {
+    try {
+      let bets;
+      
+      // Admin can see all bets, users can only see their own
+      if (req.user.isAdmin) {
+        bets = await storage.getBets();
+      } else {
+        bets = await storage.getUserBets(req.user.id);
+      }
+      
+      res.json(bets);
+    } catch (error) {
+      console.error("Error getting bets:", error);
+      res.status(500).json({ message: "Failed to get bets" });
+    }
+  });
+
+  app.get('/api/bets/user', isAuthenticated, async (req, res) => {
+    try {
+      const bets = await storage.getUserBets(req.user.id);
+      res.json(bets);
+    } catch (error) {
+      console.error("Error getting user bets:", error);
+      res.status(500).json({ message: "Failed to get user bets" });
+    }
+  });
+
+  app.get('/api/bets/match/:matchId', isAuthenticated, async (req, res) => {
+    try {
+      const matchId = parseInt(req.params.matchId);
+      const bets = await storage.getBetsByMatch(matchId);
+      res.json(bets);
+    } catch (error) {
+      console.error("Error getting match bets:", error);
+      res.status(500).json({ message: "Failed to get match bets" });
+    }
+  });
+
+  app.get('/api/bets/round/:roundId', isAuthenticated, async (req, res) => {
+    try {
+      const roundId = parseInt(req.params.roundId);
+      const bets = await storage.getBetsByRound(roundId);
+      res.json(bets);
+    } catch (error) {
+      console.error("Error getting round bets:", error);
+      res.status(500).json({ message: "Failed to get round bets" });
+    }
+  });
+
+  app.post('/api/bets', isAuthenticated, async (req, res) => {
+    try {
+      // Ensure user is placing bet for themselves (unless admin)
+      const data = {
+        ...insertBetSchema.parse(req.body),
+        userId: req.user.id, // Always use the authenticated user's ID
+      };
+      
+      // Calculate potential payout based on odds
+      if (data.amount && data.odds) {
+        const amount = parseFloat(data.amount.toString());
+        const odds = parseFloat(data.odds.toString());
+        data.potentialPayout = (amount * odds).toString();
+      }
+      
+      const result = await storage.createBet(data);
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating bet:", error);
+      res.status(500).json({ message: "Failed to create bet" });
+    }
+  });
+
+  app.post('/api/bets/:id/settle', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const betId = parseInt(req.params.id);
+      const { status, actualResult } = req.body;
+      
+      // Only admins can settle bets
+      const result = await storage.settleBet(betId, status, actualResult, req.user.id);
+      res.json(result);
+    } catch (error) {
+      console.error("Error settling bet:", error);
+      res.status(500).json({ message: "Failed to settle bet" });
+    }
+  });
+
+  // Parlay API
+  app.post('/api/parlays', isAuthenticated, async (req, res) => {
+    try {
+      const { betIds, ...parlayData } = req.body;
+      const data = {
+        ...insertParlaySchema.parse(parlayData),
+        userId: req.user.id, // Always use the authenticated user's ID
+      };
+      
+      const result = await storage.createParlay(data, betIds);
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating parlay:", error);
+      res.status(500).json({ message: "Failed to create parlay" });
+    }
+  });
+
+  app.get('/api/parlays', isAuthenticated, async (req, res) => {
+    try {
+      let parlays;
+      
+      // Admin can see all parlays, users can only see their own
+      if (req.user.isAdmin) {
+        parlays = await storage.getParlays();
+      } else {
+        parlays = await storage.getUserParlays(req.user.id);
+      }
+      
+      res.json(parlays);
+    } catch (error) {
+      console.error("Error getting parlays:", error);
+      res.status(500).json({ message: "Failed to get parlays" });
+    }
+  });
+
+  // Ledger API
+  app.get('/api/ledger', isAuthenticated, async (req, res) => {
+    try {
+      let entries;
+      
+      // Admin can see all ledger entries, users can only see their own
+      if (req.user.isAdmin) {
+        entries = await storage.getLedgerEntries();
+      } else {
+        entries = await storage.getUserLedgerEntries(req.user.id);
+      }
+      
+      res.json(entries);
+    } catch (error) {
+      console.error("Error getting ledger entries:", error);
+      res.status(500).json({ message: "Failed to get ledger entries" });
+    }
+  });
+
+  app.get('/api/ledger/balance', isAuthenticated, async (req, res) => {
+    try {
+      const balance = await storage.getUserBalance(req.user.id);
+      res.json(balance);
+    } catch (error) {
+      console.error("Error getting user balance:", error);
+      res.status(500).json({ message: "Failed to get user balance" });
+    }
+  });
+
   return httpServer;
 }

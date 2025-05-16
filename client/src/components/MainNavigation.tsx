@@ -37,6 +37,15 @@ const MainNavigation = ({ isOpen, onNavigate }: MainNavigationProps) => {
             </button>
           </li>
 
+          <li>
+            <button 
+              className="block w-full text-left py-2 hover:bg-gray-100 px-3 rounded"
+              onClick={() => onNavigate('/sportsbook')}
+            >
+              Sportsbook
+            </button>
+          </li>
+
           {!isAuthenticated ? (
             <li>
               <button 

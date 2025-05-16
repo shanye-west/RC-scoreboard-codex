@@ -14,6 +14,7 @@ import LoginPage from "@/pages/Login";
 import SetPinPage from "@/pages/SetPin";
 import TestCourses from "@/pages/TestCourses";
 import TournamentHistory from "@/pages/TournamentHistory";
+import Sportsbook from "@/pages/Sportsbook";
 import Layout from "@/components/Layout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -144,6 +145,7 @@ function Router() {
       </Route>
       <Route path="/teams" component={Teams} />
       <Route path="/history" component={TournamentHistory} />
+      <Route path="/sportsbook" component={Sportsbook} />
       <Route path="/login" component={LoginPage} />
       <Route path="/set-pin" component={SetPinPage} />
       <Route path="/auth" component={AuthPage} />
