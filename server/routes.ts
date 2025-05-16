@@ -913,7 +913,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const score = insertBestBallScoreSchema.parse(req.body);
       
-      // Step 1: Save to best_ball_player_scores table
+      // Get the match to find the round
+      const match = await storage.getMatch(score.matchId);
+      if (!match || !match.roundId) {
+        throw new Error('Match not found or no round associated');
+      }
+      
+      // Calculate and include handicap strokes
+      if (!score.handicapStrokes) {
+        try {
+          // Calculate handicap strokes for this player on this hole
+          const handicapStrokes = await storage.getHoleHandicapStrokes(
+            score.playerId, 
+            match.roundId, 
+            score.holeNumber
+          );
+          
+          // Include the calculated handicap strokes in the score object
+          score.handicapStrokes = handicapStrokes;
+          
+          // If the score is provided, calculate the net score
+          if (score.score !== null) {
+            score.netScore = Math.max(0, score.score - handicapStrokes);
+          }
+        } catch (handicapError) {
+          console.warn("Warning: Failed to calculate handicap strokes:", handicapError);
+          // Use default of 0 if calculation fails
+          score.handicapStrokes = 0;
+        }
+      }
+      
+      // Step 1: Save to best_ball_player_scores table with handicap info
       const result = await storage.saveBestBallScore(score);
       
       // Step 2: Ensure player_scores is also updated for consistency
@@ -924,7 +954,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             matchId: score.matchId,
             holeNumber: score.holeNumber,
             score: score.score,
-            tournamentId: null
+            tournamentId: null,
+            handicapStrokes: score.handicapStrokes || 0,
+            netScore: score.netScore || score.score
           });
         } catch (playerScoreError) {
           console.warn("Warning: Failed to update player_scores table:", playerScoreError);

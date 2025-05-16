@@ -571,30 +571,17 @@ const Match = ({ id }: { id: number }) => {
             result={match.result}
           />
 
-          {/* Specialized Scorecard Components */}
-          {round?.matchType === "2-man Team Best Ball" ? (
-            <BestBallScorecard
-              matchId={id}
-              holes={holes || []}
-              scores={scores || []}
-              onTeamScoreUpdate={handleScoreUpdate}
-              matchStatus={match.status}
-              matchType={round?.matchType}
-              locked={isLocked}
-              participants={participants}
-            />
-          ) : (
-            <EnhancedMatchScorecard
-              matchId={id}
-              holes={holes || []}
-              scores={scores || []}
-              onScoreUpdate={handleScoreUpdate}
-              matchStatus={match.status}
-              matchType={round?.matchType || ""}
-              locked={isLocked}
-              participants={participants}
-            />
-          )}
+          {/* Enhanced Match Scorecard */}
+          <EnhancedMatchScorecard
+            matchId={id}
+            holes={holes || []}
+            scores={scores || []}
+            onScoreUpdate={handleScoreUpdate}
+            matchStatus={match.status}
+            matchType={round?.matchType || ""}
+            locked={isLocked}
+            participants={participants}
+          />
         </>
       )}
 
