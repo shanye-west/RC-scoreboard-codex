@@ -51,7 +51,7 @@ export default function BestBallScorecard({
   isMobile = false,
 }: BestBallScorecardProps) {
   // State for scores, loading, and locking
-  const [playerScores, setPlayerScores] = useState(new Map<string, BestBallPlayerScore[]>());
+  const [playerScores, setPlayerScores] = useState<Map<string, BestBallPlayerScore[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
   
@@ -82,15 +82,9 @@ export default function BestBallScorecard({
     [frontNinePar, backNinePar]
   );
   
-  // Fetch player scores from API
-  const { data: playerScoresData = [], isLoading: scoresLoading } = useQuery<any[]>({
+  // Fetch regular player scores from API
+  const { data: playerScoresData = [] } = useQuery<any[]>({
     queryKey: [`/api/player-scores?matchId=${matchId}`],
-    enabled: !!matchId,
-  });
-  
-  // Fetch best ball scores
-  const { data: bestBallScores = [], isLoading: bestBallLoading } = useQuery<any[]>({
-    queryKey: [`/api/best-ball-scores/${matchId}`],
     enabled: !!matchId,
   });
   
@@ -125,7 +119,7 @@ export default function BestBallScorecard({
     return handicapData?.courseHandicap || 0;
   };
   
-  // Mutation for saving individual player scores
+  // Mutation for saving scores via regular player_scores endpoint
   const savePlayerScoreMutation = useMutation({
     mutationFn: async ({
       holeNumber,
@@ -153,52 +147,6 @@ export default function BestBallScorecard({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
-    },
-  });
-  
-  // Mutation for saving best ball scores
-  const saveBestBallScoreMutation = useMutation({
-    mutationFn: async ({
-      holeNumber,
-      playerId,
-      matchId,
-      teamId,
-      score,
-      handicapStrokes,
-      netScore
-    }: {
-      holeNumber: number;
-      playerId: number;
-      matchId: number;
-      teamId: string;
-      score: number | null;
-      handicapStrokes: number;
-      netScore: number | null;
-    }) => {
-      try {
-        // Save to best_ball_player_scores table
-        const bestBallResponse = await apiRequest("POST", `/api/best-ball-scores`, {
-          holeNumber,
-          playerId,
-          matchId,
-          teamId,
-          score,
-          handicapStrokes,
-          netScore
-        });
-        
-        if (!bestBallResponse.ok) {
-          throw new Error("Failed to save best ball score");
-        }
-        
-        return await bestBallResponse.json();
-      } catch (error) {
-        console.error("Error saving best ball score:", error);
-        throw error;
-      }
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
     },
   });
   
@@ -293,31 +241,9 @@ export default function BestBallScorecard({
       });
     }
     
-    // Also overlay with individual best ball scores if available
-    if (bestBallScores?.length > 0) {
-      bestBallScores.forEach((score: any) => {
-        if (!score || !score.playerId || !score.holeNumber) return; // Skip invalid scores
-        
-        const player = allPlayers?.find((p: any) => p.id === score.playerId);
-        if (player && player.name) {
-          const key = `${score.holeNumber}-${player.name}`;
-          
-          if (newScores.has(key) && newScores.get(key)?.length > 0) {
-            const playerScore = newScores.get(key)?.[0];
-            if (playerScore) {
-              // Update the existing score object with best ball score data
-              playerScore.score = score.score;
-              playerScore.handicapStrokes = score.handicapStrokes || 0;
-              playerScore.netScore = score.netScore;
-            }
-          }
-        }
-      });
-    }
-    
     setPlayerScores(newScores);
     setLoading(false);
-  }, [playerScoresData, bestBallScores, holes, aviatorPlayersList, producerPlayersList, allPlayers, participants]);
+  }, [playerScoresData, holes, aviatorPlayersList, producerPlayersList, allPlayers, participants]);
   
   // Check if a player score is the lowest for their team on that hole
   const isLowestScore = (holeNumber: number, playerName: string, team: string) => {
@@ -369,23 +295,13 @@ export default function BestBallScorecard({
     updatedScores.set(key, [{ ...scoreData, score, netScore }]);
     setPlayerScores(updatedScores);
     
-    // Save to database
+    // Save to database using regular player_scores endpoint
     if (score !== null) {
       savePlayerScoreMutation.mutate({
         holeNumber,
         playerId: scoreData.playerId,
         matchId,
         score,
-      });
-      
-      saveBestBallScoreMutation.mutate({
-        holeNumber,
-        playerId: scoreData.playerId,
-        matchId,
-        teamId: team === "aviator" ? "1" : "2",
-        score,
-        handicapStrokes: scoreData.handicapStrokes,
-        netScore
       });
     }
     
@@ -547,7 +463,7 @@ export default function BestBallScorecard({
   const producerFrontTotals = useMemo(() => calculateTeamTotal("producer"), [playerScores, frontNine, backNine]);
   
   // Check if data is still loading
-  if (loading || scoresLoading || bestBallLoading) {
+  if (loading) {
     return (
       <div className="best-ball-scorecard-container">
         <Skeleton className="h-12 w-full mb-4" />
