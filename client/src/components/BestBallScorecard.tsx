@@ -657,7 +657,7 @@ const BestBallScorecard = ({
           <div className="border-t border-red-300 pt-1 mt-2 flex items-center justify-between">
             <span className="font-medium">Best Score:</span>
             <span className="font-bold">
-              {matchScore?.producerScore !== null ? matchScore.producerScore : '-'}
+              {matchScore && matchScore.producerScore !== null ? matchScore.producerScore : '-'}
             </span>
           </div>
         </div>
