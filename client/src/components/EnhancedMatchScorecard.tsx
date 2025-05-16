@@ -1,9 +1,15 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import React from "react";
+import {
+  saveScoreToLocalStorage,
+  getPendingScores,
+  getScoreFromLocalStorage,
+  markScoreAsSynced,
+  getMatchScoresFromLocalStorage
+} from "@/lib/offlineStorage";
 
 // DEFINE INTERFACES
 interface Hole {
@@ -374,7 +380,7 @@ const EnhancedMatchScorecard = ({
   const backNine = [...holes].filter((h) => h.number > 9).sort((a, b) => a.number - b.number);
   
   // Add a ref to track if handicap strokes have been loaded
-  const handicapStrokesLoaded = React.useRef(false);
+  const handicapStrokesLoaded = useRef(false);
 
   // Load saved player scores from the database
   useEffect(() => {
@@ -774,43 +780,13 @@ const EnhancedMatchScorecard = ({
     }, 100);
   };
 
-  // Local storage helper for offline resilience
-  const saveScoreToLocalStorage = (score: {
-    matchId: number;
-    playerId: number;
-    holeNumber: number;
-    score: number | null;
-    handicapStrokes: number;
-    netScore: number | null;
-  }) => {
-    try {
-      // Create a unique key for this score
-      const scoreKey = `score_${score.matchId}_${score.playerId}_${score.holeNumber}`;
-      
-      // Save to local storage
-      localStorage.setItem(scoreKey, JSON.stringify({
-        ...score,
-        timestamp: new Date().toISOString(),
-        synced: false
-      }));
-      
-      // Also maintain a list of pending scores to sync
-      const pendingScores = JSON.parse(localStorage.getItem('pendingScores') || '[]');
-      if (!pendingScores.includes(scoreKey)) {
-        pendingScores.push(scoreKey);
-        localStorage.setItem('pendingScores', JSON.stringify(pendingScores));
-      }
-      
-      console.log(`Score saved to local storage: ${scoreKey}`);
-    } catch (error) {
-      console.error("Failed to save score to local storage:", error);
-    }
-  };
+  // Reference to track if we've initialized scores from local storage
+  const localStorageLoaded = useRef(false);
   
   // Function to sync pending scores from local storage
   const syncPendingScores = async () => {
     try {
-      const pendingScores = JSON.parse(localStorage.getItem('pendingScores') || '[]');
+      const pendingScores = getPendingScores();
       if (pendingScores.length === 0) return;
       
       console.log(`Attempting to sync ${pendingScores.length} pending scores`);
@@ -819,25 +795,19 @@ const EnhancedMatchScorecard = ({
       
       for (const scoreKey of pendingScores) {
         try {
-          const scoreData = JSON.parse(localStorage.getItem(scoreKey) || '{}');
-          if (!scoreData.matchId) continue; // Skip invalid data
+          const scoreData = getScoreFromLocalStorage(scoreKey);
+          if (!scoreData || !scoreData.matchId) continue; // Skip invalid data
           
           // Attempt to save to server
           await saveScoreToServer(scoreData);
           
           // Mark as synced in local storage
-          localStorage.setItem(scoreKey, JSON.stringify({
-            ...scoreData,
-            synced: true
-          }));
+          markScoreAsSynced(scoreKey);
         } catch (error) {
           console.error(`Failed to sync score ${scoreKey}:`, error);
           failedScores.push(scoreKey);
         }
       }
-      
-      // Update pending scores list to only include failed scores
-      localStorage.setItem('pendingScores', JSON.stringify(failedScores));
       
       console.log(`Synced ${pendingScores.length - failedScores.length} scores, ${failedScores.length} failed`);
       
@@ -857,16 +827,23 @@ const EnhancedMatchScorecard = ({
     playerId: number;
     holeNumber: number;
     score: number | null;
-    handicapStrokes: number;
-    netScore: number | null;
+    handicapStrokes?: number;
+    netScore?: number | null;
   }) => {
+    // Ensure handicapStrokes is never undefined
+    const scoreToSave = {
+      ...score,
+      handicapStrokes: score.handicapStrokes || 0,
+      netScore: score.netScore || null
+    };
+    
     // First try best_ball_player_scores
     const bestBallResponse = await fetch('/api/best-ball-scores', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(score),
+      body: JSON.stringify(scoreToSave),
     });
     
     if (!bestBallResponse.ok) {
@@ -950,7 +927,7 @@ const EnhancedMatchScorecard = ({
   });
 
   // Reference to track if we've already loaded scores to prevent infinite loops
-  const individualScoresLoaded = React.useRef(false);
+  const individualScoresLoaded = useRef(false);
 
   // Load individual scores into state when they're fetched
   useEffect(() => {
@@ -964,7 +941,7 @@ const EnhancedMatchScorecard = ({
       const newPlayerScores = new Map();
       const allParticipants = [...aviatorPlayersList, ...producerPlayersList];
       
-      individualScores.forEach(score => {
+      individualScores.forEach((score: any) => {
         const player = allParticipants.find((p: Player) => p.id === score.playerId);
         
         if (player) {
@@ -984,7 +961,7 @@ const EnhancedMatchScorecard = ({
           const teamScores = newPlayerScores.get(teamKey) || [];
           
           // Check if player already exists in team scores
-          const existingIndex = teamScores.findIndex(s => s.playerId === score.playerId);
+          const existingIndex = teamScores.findIndex((s: any) => s.playerId === score.playerId);
           if (existingIndex >= 0) {
             teamScores[existingIndex] = scoreObj;
           } else {
@@ -1003,7 +980,7 @@ const EnhancedMatchScorecard = ({
         setPlayerScores(newPlayerScores);
       }
     }
-  }, [individualScores]);
+  }, [individualScores, aviatorPlayersList, producerPlayersList]);
   
   // Fix for: Type 'MapIterator<[string, BestBallPlayerScore[]]>' can only be iterated through
   const updateBestBallScores = (
