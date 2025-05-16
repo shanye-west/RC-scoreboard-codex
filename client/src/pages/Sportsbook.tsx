@@ -94,14 +94,14 @@ const Sportsbook: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("available-bets");
-  const [selectedBetType, setSelectedBetType] = useState<BetType | null>(null);
+  const [selectedBetType, setSelectedBetType] = useState<any>(null);
 
   // Query for bet types
   const {
     data: betTypes,
     isLoading: isLoadingBetTypes,
     error: betTypesError,
-  } = useQuery<BetType[]>({
+  } = useQuery({
     queryKey: ["/api/bet-types"],
     enabled: true,
   });
@@ -112,7 +112,7 @@ const Sportsbook: React.FC = () => {
     isLoading: isLoadingUserBets,
     error: userBetsError,
     refetch: refetchUserBets,
-  } = useQuery<Bet[]>({
+  } = useQuery({
     queryKey: ["/api/bets/user"],
     enabled: isAuthenticated,
   });
@@ -122,7 +122,7 @@ const Sportsbook: React.FC = () => {
     data: matches,
     isLoading: isLoadingMatches,
     error: matchesError,
-  } = useQuery<Match[]>({
+  } = useQuery({
     queryKey: ["/api/matches"],
     enabled: true,
   });
@@ -132,7 +132,7 @@ const Sportsbook: React.FC = () => {
     data: rounds,
     isLoading: isLoadingRounds,
     error: roundsError,
-  } = useQuery<Round[]>({
+  } = useQuery({
     queryKey: ["/api/rounds"],
     enabled: true,
   });
@@ -142,7 +142,7 @@ const Sportsbook: React.FC = () => {
     data: players,
     isLoading: isLoadingPlayers,
     error: playersError,
-  } = useQuery<Player[]>({
+  } = useQuery({
     queryKey: ["/api/players"],
     enabled: true,
   });
@@ -153,7 +153,7 @@ const Sportsbook: React.FC = () => {
     isLoading: isLoadingBalance,
     error: balanceError,
     refetch: refetchBalance,
-  } = useQuery<{ balance: string }>({
+  } = useQuery({
     queryKey: ["/api/ledger/balance"],
     enabled: isAuthenticated,
   });
@@ -176,7 +176,7 @@ const Sportsbook: React.FC = () => {
 
   // Handle bet type change
   const handleBetTypeChange = (value: string) => {
-    const betType = betTypes?.find((bt: BetType) => bt.id.toString() === value);
+    const betType = Array.isArray(betTypes) ? betTypes.find((bt: any) => bt.id.toString() === value) : undefined;
     setSelectedBetType(betType || null);
     
     // Reset form values that depend on bet type
@@ -269,7 +269,8 @@ const Sportsbook: React.FC = () => {
     isLoadingPlayers ||
     isLoadingBalance;
 
-  if (isLoading) {
+  // Defensive: Show error if any main query fails
+  if (betTypesError || matchesError || roundsError || playersError) {
     return (
       <div className="container py-10">
         <Card>
@@ -277,12 +278,56 @@ const Sportsbook: React.FC = () => {
             <CardTitle>Sportsbook</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Loading...</p>
+            <p className="text-red-600 font-semibold">Error loading Sportsbook data. Please try again later.</p>
+            {betTypesError && <p>Bet Types Error: {String(betTypesError)}</p>}
+            {matchesError && <p>Matches Error: {String(matchesError)}</p>}
+            {roundsError && <p>Rounds Error: {String(roundsError)}</p>}
+            {playersError && <p>Players Error: {String(playersError)}</p>}
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  // Defensive: Show loading if any main query is loading
+  if (isLoadingBetTypes || isLoadingMatches || isLoadingRounds || isLoadingPlayers) {
+    return (
+      <div className="container py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle>Sportsbook</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Loading Sportsbook data...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Defensive: If betTypes is not loaded or not an array, show a message
+  if (!Array.isArray(betTypes) || betTypes.length === 0) {
+    return (
+      <div className="container py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle>Sportsbook</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>No bet types available. Please check back later.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Defensive: Ensure matches, rounds, players are arrays before using them
+  const safeMatches = Array.isArray(matches) ? matches : [];
+  const safeRounds = Array.isArray(rounds) ? rounds : [];
+  const safePlayers = Array.isArray(players) ? players : [];
+
+  // Defensive: Ensure userBets is an array before using it
+  const safeUserBets = Array.isArray(userBets) ? userBets : [];
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -309,8 +354,6 @@ const Sportsbook: React.FC = () => {
                 <p>Loading available bets...</p>
               ) : betTypesError ? (
                 <p>Error loading bets. Please try again later.</p>
-              ) : betTypes?.length === 0 ? (
-                <p>No bets available at the moment.</p>
               ) : (
                 <div className="space-y-4">
                   {betTypes?.map((betType: any) => (
@@ -348,9 +391,9 @@ const Sportsbook: React.FC = () => {
           <>
             <TabsContent value="my-bets" className="space-y-4">
               <h2 className="text-xl font-semibold">My Active Bets</h2>
-              {userBets && userBets.length > 0 ? (
+              {safeUserBets.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
-                  {userBets
+                  {safeUserBets
                     .filter((bet: any) => bet.status === "pending")
                     .map((bet: any) => (
                       <Card key={bet.id} className="p-4">
@@ -386,9 +429,9 @@ const Sportsbook: React.FC = () => {
               )}
 
               <h2 className="text-xl font-semibold mt-8">Bet History</h2>
-              {userBets && userBets.length > 0 ? (
+              {safeUserBets.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
-                  {userBets
+                  {safeUserBets
                     .filter((bet: any) => bet.status !== "pending")
                     .map((bet: any) => (
                       <Card key={bet.id} className="p-4">
@@ -505,8 +548,8 @@ const Sportsbook: React.FC = () => {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {matches &&
-                                        matches.map((match: any) => (
+                                      {safeMatches &&
+                                        safeMatches.map((match: any) => (
                                           <SelectItem
                                             key={match.id}
                                             value={match.id.toString()}
@@ -542,8 +585,8 @@ const Sportsbook: React.FC = () => {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {rounds &&
-                                        rounds.map((round: any) => (
+                                      {safeRounds &&
+                                        safeRounds.map((round: any) => (
                                           <SelectItem
                                             key={round.id}
                                             value={round.id.toString()}
@@ -577,8 +620,8 @@ const Sportsbook: React.FC = () => {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {players &&
-                                        players.map((player: any) => (
+                                      {safePlayers &&
+                                        safePlayers.map((player: any) => (
                                           <SelectItem
                                             key={player.id}
                                             value={player.id.toString()}
