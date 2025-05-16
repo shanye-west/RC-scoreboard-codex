@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { authenticateUser } from '../middleware/auth';
 import { appDebugger } from '../utils/appDebug';
 import { DatabaseDebugger } from '../utils/dbDebug';
+import { profiler } from '../utils/profiler';
+import { memoryProfiler } from '../utils/memoryProfiler';
 import { pool } from '../db';
 import { debugConfig } from '../config/debug';
 
@@ -93,7 +95,67 @@ router.get('/database', authenticateUser, async (req, res) => {
   }
 });
 
-// Clear debug data endpoint
+// Performance metrics endpoint
+router.get('/performance', authenticateUser, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    res.json({
+      measurements: profiler.getMeasurements(),
+      memoryTrends: memoryProfiler.getMemoryTrends(),
+    });
+  } catch (error) {
+    console.error('Error fetching performance metrics:', error);
+    res.status(500).json({ error: 'Failed to fetch performance metrics' });
+  }
+});
+
+// Memory profiling endpoints
+router.post('/memory/start', authenticateUser, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const { interval } = req.body;
+    memoryProfiler.startProfiling(interval);
+    res.json({ message: 'Memory profiling started' });
+  } catch (error) {
+    console.error('Error starting memory profiling:', error);
+    res.status(500).json({ error: 'Failed to start memory profiling' });
+  }
+});
+
+router.post('/memory/stop', authenticateUser, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    memoryProfiler.stopProfiling();
+    res.json({ message: 'Memory profiling stopped' });
+  } catch (error) {
+    console.error('Error stopping memory profiling:', error);
+    res.status(500).json({ error: 'Failed to stop memory profiling' });
+  }
+});
+
+router.get('/memory/snapshots', authenticateUser, async (req, res) => {
+  try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    res.json(memoryProfiler.getSnapshots());
+  } catch (error) {
+    console.error('Error fetching memory snapshots:', error);
+    res.status(500).json({ error: 'Failed to fetch memory snapshots' });
+  }
+});
+
+// Clear all debug data
 router.post('/clear', authenticateUser, async (req, res) => {
   try {
     if (!req.user?.isAdmin) {
@@ -102,8 +164,10 @@ router.post('/clear', authenticateUser, async (req, res) => {
 
     appDebugger.clearData();
     dbDebugger.clearStats();
+    profiler.clearMeasurements();
+    memoryProfiler.clearSnapshots();
 
-    res.json({ message: 'Debug data cleared successfully' });
+    res.json({ message: 'All debug data cleared successfully' });
   } catch (error) {
     console.error('Error clearing debug data:', error);
     res.status(500).json({ error: 'Failed to clear debug data' });
