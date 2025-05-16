@@ -107,12 +107,12 @@ export default function AdminMatchesPage() {
   const addMatchMutation = useMutation({
     mutationFn: async (matchData: any) => {
       try {
-        const res = await apiRequest("POST", "/api/matches", {
-          ...matchData,
-          roundId,
-          status: "upcoming",
-        });
-        return await res.json();
+      const res = await apiRequest("POST", "/api/matches", {
+        ...matchData,
+        roundId,
+        status: "upcoming",
+      });
+      return await res.json();
       } catch (error: any) {
         if (error.message.includes("Player is already participating in a match in this round")) {
           throw new Error("One or more selected players are already participating in another match in this round. Each player can only play in one match per round.");
@@ -186,16 +186,16 @@ export default function AdminMatchesPage() {
   // Check if a player is already in any match in this round
   const isPlayerInAnyMatch = (playerId: number): boolean => {
     if (!matches || !players) return false;
-    
+
     // Find the player
     const player = players.find(p => p.id === playerId);
     if (!player) return false;
-    
+
     // Check all active matches in this round
     return matches.some(match => {
       // Skip deleted matches
       if (match.deleted) return false;
-      
+
       // Split players into arrays
       const aviatorPlayers = match.aviatorPlayers.split(',').map(p => p.trim());
       const producerPlayers = match.producerPlayers.split(',').map(p => p.trim());
