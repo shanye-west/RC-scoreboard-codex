@@ -774,7 +774,143 @@ const EnhancedMatchScorecard = ({
     }, 100);
   };
 
-  // Mutation for saving individual scores
+  // Local storage helper for offline resilience
+  const saveScoreToLocalStorage = (score: {
+    matchId: number;
+    playerId: number;
+    holeNumber: number;
+    score: number | null;
+    handicapStrokes: number;
+    netScore: number | null;
+  }) => {
+    try {
+      // Create a unique key for this score
+      const scoreKey = `score_${score.matchId}_${score.playerId}_${score.holeNumber}`;
+      
+      // Save to local storage
+      localStorage.setItem(scoreKey, JSON.stringify({
+        ...score,
+        timestamp: new Date().toISOString(),
+        synced: false
+      }));
+      
+      // Also maintain a list of pending scores to sync
+      const pendingScores = JSON.parse(localStorage.getItem('pendingScores') || '[]');
+      if (!pendingScores.includes(scoreKey)) {
+        pendingScores.push(scoreKey);
+        localStorage.setItem('pendingScores', JSON.stringify(pendingScores));
+      }
+      
+      console.log(`Score saved to local storage: ${scoreKey}`);
+    } catch (error) {
+      console.error("Failed to save score to local storage:", error);
+    }
+  };
+  
+  // Function to sync pending scores from local storage
+  const syncPendingScores = async () => {
+    try {
+      const pendingScores = JSON.parse(localStorage.getItem('pendingScores') || '[]');
+      if (pendingScores.length === 0) return;
+      
+      console.log(`Attempting to sync ${pendingScores.length} pending scores`);
+      
+      const failedScores: string[] = [];
+      
+      for (const scoreKey of pendingScores) {
+        try {
+          const scoreData = JSON.parse(localStorage.getItem(scoreKey) || '{}');
+          if (!scoreData.matchId) continue; // Skip invalid data
+          
+          // Attempt to save to server
+          await saveScoreToServer(scoreData);
+          
+          // Mark as synced in local storage
+          localStorage.setItem(scoreKey, JSON.stringify({
+            ...scoreData,
+            synced: true
+          }));
+        } catch (error) {
+          console.error(`Failed to sync score ${scoreKey}:`, error);
+          failedScores.push(scoreKey);
+        }
+      }
+      
+      // Update pending scores list to only include failed scores
+      localStorage.setItem('pendingScores', JSON.stringify(failedScores));
+      
+      console.log(`Synced ${pendingScores.length - failedScores.length} scores, ${failedScores.length} failed`);
+      
+      // Refresh data if any scores were synced
+      if (pendingScores.length !== failedScores.length) {
+        queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
+      }
+    } catch (error) {
+      console.error("Error syncing pending scores:", error);
+    }
+  };
+  
+  // Helper function to save score to server
+  const saveScoreToServer = async (score: {
+    matchId: number;
+    playerId: number;
+    holeNumber: number;
+    score: number | null;
+    handicapStrokes: number;
+    netScore: number | null;
+  }) => {
+    // First try best_ball_player_scores
+    const bestBallResponse = await fetch('/api/best-ball-scores', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(score),
+    });
+    
+    if (!bestBallResponse.ok) {
+      console.warn('Failed to save to best_ball_player_scores, will retry later');
+    }
+    
+    // Always try to save to player_scores table for redundancy if score is not null
+    if (score.score !== null) {
+      try {
+        await apiRequest("POST", `/api/player-scores`, {
+          playerId: score.playerId,
+          matchId: score.matchId,
+          holeNumber: score.holeNumber,
+          score: score.score,
+          tournamentId: matchData?.tournamentId
+        });
+      } catch (error) {
+        console.warn("Failed to save to player_scores table:", error);
+      }
+    }
+    
+    return bestBallResponse;
+  };
+  
+  // Attempt to sync pending scores when component mounts or network is restored
+  useEffect(() => {
+    // Try to sync on component mount
+    syncPendingScores();
+    
+    // Set up network status listener to sync when back online
+    const handleOnline = () => {
+      console.log("Network connection restored, syncing pending scores");
+      syncPendingScores();
+    };
+    
+    window.addEventListener('online', handleOnline);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [matchId]);
+
+  // Mutation for saving individual scores with offline support
   const saveScoreMutation = useMutation({
     mutationFn: async (score: {
       matchId: number;
@@ -784,36 +920,23 @@ const EnhancedMatchScorecard = ({
       handicapStrokes: number;
       netScore: number | null;
     }) => {
-      // Save to best_ball_player_scores table
-      const bestBallResponse = await fetch('/api/best-ball-scores', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(score),
-      });
+      // Always save to local storage first for offline resilience
+      saveScoreToLocalStorage(score);
       
-      if (!bestBallResponse.ok) {
-        throw new Error('Failed to save best ball score');
+      try {
+        // Attempt to save to server
+        const response = await saveScoreToServer(score);
+        return response.json();
+      } catch (error) {
+        console.error("Failed to save score to server:", error);
+        // Even though server save failed, we've saved to local storage
+        // Return a success response to avoid UI disruption
+        return {
+          message: "Score saved offline. Will sync when connection is restored.",
+          offlineOnly: true,
+          ...score
+        };
       }
-      
-      // Also save to player_scores table for consistency if score is not null
-      if (score.score !== null) {
-        try {
-          await apiRequest("POST", `/api/player-scores`, {
-            playerId: score.playerId,
-            matchId: score.matchId,
-            holeNumber: score.holeNumber,
-            score: score.score,
-            tournamentId: matchData?.tournamentId
-          });
-        } catch (error) {
-          console.error("Failed to save to player_scores table:", error);
-          // Continue execution - don't fail the whole operation
-        }
-      }
-      
-      return bestBallResponse.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
