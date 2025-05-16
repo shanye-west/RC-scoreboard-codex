@@ -243,33 +243,6 @@ export class DBStorage implements IStorage {
   async getHolesByCourse(courseId: number) {
     return db.select().from(holes).where(eq(holes.courseId, courseId));
   }
-  
-  // Get a specific hole by round ID and hole number
-  async getHole(roundId: number, holeNumber: number): Promise<any | undefined> {
-    try {
-      // First, get the round to find the course
-      const round = await this.getRound(roundId);
-      if (!round || !round.courseId) {
-        return undefined;
-      }
-      
-      // Find the hole with the matching number for this course
-      const [hole] = await db
-        .select()
-        .from(holes)
-        .where(
-          and(
-            eq(holes.courseId, round.courseId),
-            eq(holes.number, holeNumber)
-          )
-        );
-        
-      return hole;
-    } catch (error) {
-      console.error("Error in getHole:", error);
-      return undefined;
-    }
-  }
 
   // Users
   async getUsers() {
@@ -970,193 +943,12 @@ export class DBStorage implements IStorage {
   }
 
   async createPlayerScore(data: any) {
-    // First, save to player_scores table
-    const [playerScoreRow] = await db
-      .insert(player_scores)
-      .values({
-        ...data,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      })
-      .returning();
-    
-    // Then synchronize with the best_ball_player_scores table to persist handicap info
-    try {
-      // Check if there's already an entry in best_ball_player_scores
-      const existingBestBallScores = await db
-        .select()
-        .from(best_ball_player_scores)
-        .where(
-          and(
-            eq(best_ball_player_scores.matchId, data.matchId),
-            eq(best_ball_player_scores.playerId, data.playerId),
-            eq(best_ball_player_scores.holeNumber, data.holeNumber)
-          )
-        );
-        
-      let handicapStrokes = 0;
-      
-      // If there's an existing best ball score, use its handicap strokes
-      if (existingBestBallScores.length > 0) {
-        handicapStrokes = existingBestBallScores[0].handicapStrokes || 0;
-        
-        // Update existing best ball score
-        await db
-          .update(best_ball_player_scores)
-          .set({
-            score: data.score,
-            netScore: data.score !== null ? data.score - handicapStrokes : null,
-            updatedAt: new Date().toISOString()
-          })
-          .where(eq(best_ball_player_scores.id, existingBestBallScores[0].id));
-      } else {
-        // No existing best ball score, try to calculate handicap strokes
-        try {
-          // Get match to find round ID
-          const matchData = await this.getMatch(data.matchId);
-          
-          if (matchData?.roundId) {
-            // Get player's course handicap
-            const handicapData = await this.getPlayerCourseHandicap(data.playerId, matchData.roundId);
-            
-            if (handicapData) {
-              // Get hole info for handicap rank
-              const holeData = await db
-                .select()
-                .from(holes)
-                .where(
-                  and(
-                    eq(holes.courseId, matchData.courseId || 0),
-                    eq(holes.number, data.holeNumber)
-                  )
-                )
-                .limit(1);
-                
-              if (holeData.length > 0 && holeData[0].handicapRank) {
-                // Calculate handicap strokes for this hole
-                handicapStrokes = handicapData.courseHandicap >= holeData[0].handicapRank ? 1 : 0;
-                
-                // Give extra stroke on hardest holes for very high handicaps
-                if (handicapStrokes > 0 && holeData[0].handicapRank <= 2 && handicapData.courseHandicap >= 18) {
-                  handicapStrokes += 1;
-                }
-              }
-            }
-          }
-        } catch (handicapError) {
-          console.warn("Error calculating handicap strokes:", handicapError);
-          // Continue with zero handicap if calculation fails
-        }
-        
-        // Create new best ball score entry
-        await db
-          .insert(best_ball_player_scores)
-          .values({
-            matchId: data.matchId,
-            playerId: data.playerId,
-            holeNumber: data.holeNumber,
-            score: data.score,
-            handicapStrokes: handicapStrokes,
-            netScore: data.score !== null ? data.score - handicapStrokes : null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-      }
-      
-      // Update team scores in scores table
-      try {
-        await this.updateTeamScoresForHole(data.matchId, data.holeNumber);
-      } catch (teamScoreError) {
-        console.warn("Error updating team scores:", teamScoreError);
-      }
-    } catch (syncError) {
-      console.warn("Error synchronizing with best_ball_player_scores:", syncError);
-      // Continue execution, returning the successfully saved player score
-    }
-    
-    return playerScoreRow;
-  }
-  
-  // Helper method to update team scores for a hole
-  async updateTeamScoresForHole(matchId: number, holeNumber: number) {
-    // Get match participants to determine teams
-    const participants = await this.getMatchParticipants(matchId);
-    
-    // Get all player scores for this hole
-    const playerScores = await db
-      .select()
-      .from(player_scores)
-      .where(
-        and(
-          eq(player_scores.matchId, matchId),
-          eq(player_scores.holeNumber, holeNumber)
-        )
-      );
-      
-    if (participants.length > 0 && playerScores.length > 0) {
-      // Group scores by team
-      const aviatorPlayers = participants.filter(p => p.team === "aviator").map(p => p.playerId);
-      const producerPlayers = participants.filter(p => p.team === "producer").map(p => p.playerId);
-      
-      const aviatorScores = playerScores.filter(s => aviatorPlayers.includes(s.playerId));
-      const producerScores = playerScores.filter(s => producerPlayers.includes(s.playerId));
-      
-      // Calculate best scores
-      const aviatorBestScore = aviatorScores.length > 0 ? 
-        Math.min(...aviatorScores.filter(s => s.score !== null).map(s => s.score)) : null;
-      
-      const producerBestScore = producerScores.length > 0 ? 
-        Math.min(...producerScores.filter(s => s.score !== null).map(s => s.score)) : null;
-      
-      // Determine winning team
-      let winningTeam = null;
-      if (aviatorBestScore !== null && producerBestScore !== null) {
-        winningTeam = aviatorBestScore < producerBestScore ? 'aviator' : 
-                     producerBestScore < aviatorBestScore ? 'producer' : 'tie';
-      }
-      
-      // Update or insert team score
-      const existingScores = await db
-        .select()
-        .from(scores)
-        .where(
-          and(
-            eq(scores.matchId, matchId),
-            eq(scores.holeNumber, holeNumber)
-          )
-        );
-        
-      if (existingScores.length > 0) {
-        await db
-          .update(scores)
-          .set({
-            aviatorScore: aviatorBestScore,
-            producerScore: producerBestScore,
-            winningTeam: winningTeam,
-            updatedAt: new Date().toISOString()
-          })
-          .where(eq(scores.id, existingScores[0].id));
-      } else {
-        await db
-          .insert(scores)
-          .values({
-            matchId: matchId,
-            holeNumber: holeNumber,
-            aviatorScore: aviatorBestScore,
-            producerScore: producerBestScore,
-            winningTeam: winningTeam,
-            matchStatus: null,
-            tournamentId: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-      }
-    }
+    const [row] = await db.insert(player_scores).values(data).returning();
+    return row;
   }
 
   async updatePlayerScore(id: number, data: Partial<any>) {
-    // First update the player_scores table
-    const [updatedPlayerScore] = await db
+    const [row] = await db
       .update(player_scores)
       .set({
         ...data,
@@ -1164,67 +956,7 @@ export class DBStorage implements IStorage {
       })
       .where(eq(player_scores.id, id))
       .returning();
-    
-    if (!updatedPlayerScore) {
-      return undefined;
-    }
-    
-    // Then synchronize with the best_ball_player_scores table
-    try {
-      // Find the corresponding best ball score record
-      const bestBallScores = await db
-        .select()
-        .from(best_ball_player_scores)
-        .where(
-          and(
-            eq(best_ball_player_scores.matchId, updatedPlayerScore.matchId),
-            eq(best_ball_player_scores.playerId, updatedPlayerScore.playerId),
-            eq(best_ball_player_scores.holeNumber, updatedPlayerScore.holeNumber)
-          )
-        );
-      
-      if (bestBallScores.length > 0) {
-        // Update existing best ball score with new score value, preserving handicap
-        const handicapStrokes = bestBallScores[0].handicapStrokes || 0;
-        const newNetScore = updatedPlayerScore.score !== null ? 
-          updatedPlayerScore.score - handicapStrokes : null;
-        
-        await db
-          .update(best_ball_player_scores)
-          .set({
-            score: updatedPlayerScore.score,
-            netScore: newNetScore,
-            updatedAt: new Date().toISOString()
-          })
-          .where(eq(best_ball_player_scores.id, bestBallScores[0].id));
-      } else {
-        // No corresponding best ball record, create one
-        await db
-          .insert(best_ball_player_scores)
-          .values({
-            matchId: updatedPlayerScore.matchId,
-            playerId: updatedPlayerScore.playerId,
-            holeNumber: updatedPlayerScore.holeNumber,
-            score: updatedPlayerScore.score,
-            handicapStrokes: 0, // Default value, will be updated later if needed
-            netScore: updatedPlayerScore.score,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-      }
-      
-      // Update team scores as well
-      try {
-        await this.updateTeamScoresForHole(updatedPlayerScore.matchId, updatedPlayerScore.holeNumber);
-      } catch (teamScoreError) {
-        console.warn("Error updating team scores during player score update:", teamScoreError);
-      }
-    } catch (syncError) {
-      console.warn("Error synchronizing with best_ball_player_scores during update:", syncError);
-      // Continue execution, returning the successfully updated player score
-    }
-    
-    return updatedPlayerScore;
+    return row;
   }
 
   async deletePlayerScore(id: number) {
@@ -1995,42 +1727,6 @@ export class DBStorage implements IStorage {
         colorCode: "#800000", // Maroon
       });
     }
-
-    // Create default bet types if they don't exist
-    const existingBetTypes = await this.getBetTypes();
-    if (existingBetTypes.length === 0) {
-      const defaultBetTypes = [
-        {
-          name: 'match_winner',
-          description: 'Bet on which team wins a specific match',
-          isActive: true,
-        },
-        {
-          name: 'player_prop',
-          description: 'Bet on whether a specific player will win, tie, or lose their match',
-          isActive: true,
-        },
-        {
-          name: 'round_winner',
-          description: 'Bet on which team wins the most matches in a given round',
-          isActive: true,
-        },
-        {
-          name: 'over_under',
-          description: 'Bet on whether a statistic will be over or under a specified value',
-          isActive: true,
-        },
-        {
-          name: 'parlay',
-          description: 'Combine multiple bets for higher risk/reward',
-          isActive: true,
-        },
-      ];
-
-      for (const betType of defaultBetTypes) {
-        await this.createBetType(betType);
-      }
-    }
     
     // Ensure admin user exists
     await this.ensureAdminUserExists();
@@ -2227,30 +1923,29 @@ export class DBStorage implements IStorage {
   async getHoleHandicapStrokes(playerId: number, roundId: number, holeNumber: number): Promise<number> {
     // Get the player's course handicap
     const handicapData = await this.getPlayerCourseHandicap(playerId, roundId);
-    if (!handicapData) {
-      console.log(`No handicap data found for player ${playerId} on round ${roundId}`);
-      return 0;
-    }
-    
     const courseHandicap = handicapData.courseHandicap || 0;
     
     if (courseHandicap <= 0) {
       return 0; // No strokes given if handicap is 0 or negative
     }
     
-    // Get the hole directly using the new method
-    const hole = await this.getHole(roundId, holeNumber);
+    // Get the round to find the course
+    const courseRound = await this.getRound(roundId);
+    if (!courseRound || !courseRound.courseId) {
+      return 0;
+    }
     
-    if (!hole || hole.handicapRank === null || hole.handicapRank === undefined) {
-      console.log(`No handicap rank found for hole ${holeNumber} in round ${roundId}`);
+    // Get the hole details including its handicap rank
+    const courseHoles = await this.getHolesByCourse(courseRound.courseId);
+    const hole = courseHoles.find(h => h.number === holeNumber);
+    
+    if (!hole || hole.handicapRank === null) {
       return 0; // No strokes if hole has no handicap ranking
     }
     
     // Determine if player gets a stroke on this hole
     // If course handicap is 9, player gets strokes on holes ranked 1-9
-    const strokes = hole.handicapRank <= courseHandicap ? 1 : 0;
-    console.log(`Player ${playerId} gets ${strokes} strokes on hole ${holeNumber} (rank: ${hole.handicapRank}, handicap: ${courseHandicap})`);
-    return strokes;
+    return hole.handicapRank <= courseHandicap ? 1 : 0;
   }
 
   async storePlayerCourseHandicap(playerId: number, roundId: number, courseHandicap: number) {
@@ -2309,96 +2004,16 @@ export class DBStorage implements IStorage {
     }
   }
 
-  // Best Ball Score methods with enhanced persistence
+  // Best Ball Score methods
   async saveBestBallScore(score: InsertBestBallScore) {
-    try {
-      // First, make sure handicap strokes is properly set
-      score.handicapStrokes = score.handicapStrokes || 0;
-      
-      // Log the received score data
-      console.log(`Saving best ball score for player ${score.playerId}, hole ${score.holeNumber}: score=${score.score}, handicap=${score.handicapStrokes}, net=${score.netScore}`);
-      
-      // If we have a score but no net score, calculate it
-      if (score.score !== null && (score.netScore === undefined || score.netScore === null)) {
-        score.netScore = Math.max(0, score.score - score.handicapStrokes);
-        console.log(`Calculated net score: ${score.netScore}`);
-      }
-      
-      // Check if this score already exists
-      const existingScore = await db
-        .select()
-        .from(best_ball_player_scores)
-        .where(
-          and(
-            eq(best_ball_player_scores.matchId, score.matchId),
-            eq(best_ball_player_scores.playerId, score.playerId),
-            eq(best_ball_player_scores.holeNumber, score.holeNumber)
-          )
-        )
-        .limit(1);
-
-      if (existingScore.length > 0) {
-        // Update existing score
-        const [updated] = await db
-          .update(best_ball_player_scores)
-          .set({
-            score: score.score,
-            handicapStrokes: score.handicapStrokes,
-            netScore: score.netScore,
-            updatedAt: new Date().toISOString()
-          })
-          .where(eq(best_ball_player_scores.id, existingScore[0].id))
-          .returning();
-        
-        console.log(`Updated best ball score id=${updated.id} with handicap=${updated.handicapStrokes}`);
-        return updated;
-      } else {
-        // Insert new score
-        const [created] = await db
-          .insert(best_ball_player_scores)
-          .values({
-            matchId: score.matchId,
-            playerId: score.playerId,
-            holeNumber: score.holeNumber,
-            score: score.score,
-            handicapStrokes: score.handicapStrokes,
-            netScore: score.netScore,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          })
-          .returning();
-        
-        console.log(`Created new best ball score id=${created.id} with handicap=${created.handicapStrokes}`);
-        return created;
-      }
-    } catch (error) {
-      console.error("Error saving best ball score:", error);
-      throw error;
-    }
-  }
-  
-  // Get player scores for a specific hole in a match
-  async getPlayerScoresByHole(matchId: number, holeNumber: number) {
-    return db
-      .select()
-      .from(player_scores)
-      .where(
-        and(
-          eq(player_scores.matchId, matchId),
-          eq(player_scores.holeNumber, holeNumber)
-        )
-      );
-  }
-  
-  // Save a team score to the scores table
-  async saveTeamScore(score: InsertScore) {
     const existingScore = await db
       .select()
-      .from(scores)
+      .from(best_ball_player_scores)
       .where(
         and(
-          eq(scores.matchId, score.matchId),
-          eq(scores.holeNumber, score.holeNumber)
+          eq(best_ball_player_scores.matchId, score.matchId),
+          eq(best_ball_player_scores.playerId, score.playerId),
+          eq(best_ball_player_scores.holeNumber, score.holeNumber)
         )
       )
       .limit(1);
@@ -2406,20 +2021,19 @@ export class DBStorage implements IStorage {
     if (existingScore.length > 0) {
       // Update existing score
       return db
-        .update(scores)
+        .update(best_ball_player_scores)
         .set({
-          aviatorScore: score.aviatorScore,
-          producerScore: score.producerScore,
-          winningTeam: score.winningTeam,
-          matchStatus: score.matchStatus,
-          tournamentId: score.tournamentId
+          score: score.score,
+          handicapStrokes: score.handicapStrokes,
+          netScore: score.netScore,
+          updatedAt: new Date().toISOString()
         })
-        .where(eq(scores.id, existingScore[0].id))
+        .where(eq(best_ball_player_scores.id, existingScore[0].id))
         .returning();
     } else {
       // Insert new score
       return db
-        .insert(scores)
+        .insert(best_ball_player_scores)
         .values(score)
         .returning();
     }
@@ -2447,13 +2061,7 @@ export class DBStorage implements IStorage {
 
   // Sportsbook methods - Bet Types
   async getBetTypes(): Promise<BetType[]> {
-    try {
-      const result = await db.select().from(bet_types).where(eq(bet_types.isActive, true));
-      return result;
-    } catch (error) {
-      console.error("Error fetching bet types:", error);
-      throw error;
-    }
+    return db.select().from(bet_types);
   }
 
   async getBetType(id: number): Promise<BetType | undefined> {

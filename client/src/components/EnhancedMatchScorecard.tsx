@@ -1,23 +1,8 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  saveScoreToLocalStorage,
-  getPendingScores,
-  getScoreFromLocalStorage,
-  markScoreAsSynced,
-  getMatchScoresFromLocalStorage
-} from "@/lib/offlineStorage";
-import {
-  savePlayerCourseHandicap,
-  getPlayerCourseHandicapFromStorage,
-  saveHandicapStrokes,
-  getHandicapStrokesFromStorage,
-  calculateHandicapStrokes
-} from "@/lib/handicapUtils";
-import BestBallScorecard from './BestBallScorecard';
 
 // DEFINE INTERFACES
 interface Hole {
@@ -115,53 +100,39 @@ const EnhancedMatchScorecard = ({
   
   // Function to calculate handicap strokes for a player on a specific hole
   const getHandicapStrokes = async (playerId: number, holeNumber: number) => {
-    if (!isBestBall) return 0;
+    if (!matchData?.roundId || !isBestBall) return 0;
     
     try {
-      // Check for cached handicap strokes in localStorage first
-      const cachedStrokes = getHandicapStrokesFromStorage(playerId, holeNumber, matchId);
-      if (cachedStrokes > 0) {
-        return cachedStrokes;
-      }
-      
       // Get player's course handicap
       const courseHandicap = getPlayerCourseHandicap(playerId);
       
       // Find player details for logging
-      const playerName = [...aviatorPlayersList, ...producerPlayersList].find((p: Player) => p.id === playerId)?.name || `Player ${playerId}`;
+      const playerName = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === playerId)?.name || `Player ${playerId}`;
       
       // Find the hole with the matching number
-      const hole = holes.find((h: Hole) => h.number === holeNumber);
+      const hole = holes.find(h => h.number === holeNumber);
       const handicapRank = hole?.handicapRank || 0;
       
       console.log(`Calculating handicap strokes for ${playerName} (id: ${playerId}) on hole ${holeNumber}`);
       console.log(`- Course Handicap: ${courseHandicap}, Hole Handicap Rank: ${handicapRank}`);
-      
-      let strokes = 0;
       
       // Calculate strokes based on hole handicap rank
       // If player's handicap is higher than or equal to the hole's handicap rank, they get a stroke
       // For example, if player has handicap 8 and hole rank is 5, they get a stroke
       if (handicapRank > 0 && courseHandicap >= handicapRank) {
         console.log(`- ${playerName} gets 1 stroke on hole ${holeNumber}`);
-        strokes = 1;
+        return 1;
       }
       
       // Calculate additional strokes for very high handicaps
       // If player has handicap 19+ on hole rank 1, they get 2 strokes
       if (handicapRank === 1 && courseHandicap >= 19) {
         console.log(`- ${playerName} gets 2 strokes on hole ${holeNumber}`);
-        strokes = 2;
+        return 2;
       }
       
-      if (strokes === 0) {
       console.log(`- ${playerName} gets 0 strokes on hole ${holeNumber}`);
-      }
-      
-      // Save to localStorage for persistence
-      saveHandicapStrokes(playerId, holeNumber, matchId, strokes);
-      
-      return strokes;
+      return 0;
     } catch (error) {
       console.error("Error calculating handicap strokes:", error);
       return 0;
@@ -187,12 +158,12 @@ const EnhancedMatchScorecard = ({
   const isParticipant = useMemo(() => {
     if (!user) return false;
     
-    const participantPlayerIds = participants?.map((p: { playerId: number }) => p.playerId) || [];
-    const userPlayers = allPlayers.filter((player: { userId: number }) => player.userId === user.id);
-    const userPlayerIds = userPlayers.map((player: { id: number }) => player.id);
+    const participantPlayerIds = participants?.map((p: any) => p.playerId) || [];
+    const userPlayers = allPlayers.filter((player: any) => player.userId === user.id);
+    const userPlayerIds = userPlayers.map((player: any) => player.id);
     
     // Check if any of user's players are participants in this match
-    return userPlayerIds.some((id: number) => participantPlayerIds.includes(id));
+    return userPlayerIds.some(id => participantPlayerIds.includes(id));
   }, [user, participants, allPlayers]);
   
   // Determine if user can edit scores (is admin or participant)
@@ -261,7 +232,7 @@ const EnhancedMatchScorecard = ({
       queryClient.invalidateQueries({ queryKey: [`/api/round-handicaps/${matchData?.roundId}`] });
       
       // Find player
-      const player = [...aviatorPlayersList, ...producerPlayersList].find((p: Player) => p.id === variables.playerId);
+      const player = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === variables.playerId);
       if (!player) return;
       
       // Recalculate handicap strokes for this player on all holes
@@ -290,7 +261,7 @@ const EnhancedMatchScorecard = ({
             // Also update team key
             const teamKey = `${hole.number}-${player.teamId === 1 ? "aviator" : "producer"}`;
             const teamScores = newMap.get(teamKey) || [];
-            const playerIndex = teamScores.findIndex((s: BestBallPlayerScore) => s.player === player.name);
+            const playerIndex = teamScores.findIndex(s => s.player === player.name);
             
             if (playerIndex >= 0) {
               teamScores[playerIndex] = {
@@ -332,25 +303,12 @@ const EnhancedMatchScorecard = ({
     }
   });
   
-  // For debounced invalidation
-  let invalidationTimer: ReturnType<typeof setTimeout>;
-
-  // Function to get a player's course handicap with localStorage fallback
+  // Function to get a player's course handicap
   const getPlayerCourseHandicap = (playerId: number): number => {
-    if (!playerHandicaps || !playerHandicaps.length) {
-      // Try to get from localStorage if not available from API
-      return getPlayerCourseHandicapFromStorage(playerId, matchData?.roundId || 0);
-    }
+    if (!playerHandicaps || !playerHandicaps.length) return 0;
     
     const handicapEntry = playerHandicaps.find(h => h.playerId === playerId);
-    const handicap = handicapEntry?.courseHandicap || 0;
-    
-    // Save to localStorage for persistence
-    if (matchData?.roundId) {
-      savePlayerCourseHandicap(playerId, matchData.roundId, handicap);
-    }
-    
-    return handicap;
+    return handicapEntry?.courseHandicap || 0;
   };
   
   // Function to handle handicap edit
@@ -375,13 +333,13 @@ const EnhancedMatchScorecard = ({
     });
   };
 
-  // Fix for: Parameter 'p' implicitly has an 'any' type
+  // Split participants into teams
   const aviatorPlayersList = useMemo(() => {
     if (!Array.isArray(participants)) return [];
 
     return participants
-      .filter((p: { team: string }) => p.team === "aviator" || p.team === "aviators")
-      .map((p: { playerId: number }) => {
+      .filter((p: any) => p.team === "aviator" || p.team === "aviators")
+      .map((p: any) => {
         if (!Array.isArray(allPlayers)) return { id: p.playerId, name: `Player ${p.playerId}`, teamId: 1 };
 
         // Find the player details from allPlayers
@@ -394,8 +352,8 @@ const EnhancedMatchScorecard = ({
     if (!Array.isArray(participants)) return [];
 
     return participants
-      .filter((p: { team: string }) => p.team === "producer" || p.team === "producers")
-      .map((p: { playerId: number }) => {
+      .filter((p: any) => p.team === "producer" || p.team === "producers")
+      .map((p: any) => {
         if (!Array.isArray(allPlayers)) return { id: p.playerId, name: `Player ${p.playerId}`, teamId: 2 };
 
         // Find the player details from allPlayers
@@ -414,9 +372,6 @@ const EnhancedMatchScorecard = ({
   const frontNine = [...holes].filter((h) => h.number <= 9).sort((a, b) => a.number - b.number);
   const backNine = [...holes].filter((h) => h.number > 9).sort((a, b) => a.number - b.number);
   
-  // Add a ref to track if handicap strokes have been loaded
-  const handicapStrokesLoaded = useRef(false);
-
   // Load saved player scores from the database
   useEffect(() => {
     if (!existingPlayerScores || existingPlayerScores.length === 0) return;
@@ -424,14 +379,14 @@ const EnhancedMatchScorecard = ({
     console.log("Loading saved player scores from database:", existingPlayerScores);
     
     // Create a new Map to hold all loaded scores
-    const loadedScores = new Map();
+    const loadedScores = new Map(playerScores);
     
     // Process each saved player score
     existingPlayerScores.forEach((savedScore: any) => {
       const { playerId, holeNumber, score, handicapStrokes = 0 } = savedScore;
       
       // Find the player from our lists
-      const player = [...aviatorPlayersList, ...producerPlayersList].find((p: Player) => p.id === playerId);
+      const player = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === playerId);
       if (!player) return;
       
       // Determine team ID - convert plural form to singular
@@ -458,7 +413,7 @@ const EnhancedMatchScorecard = ({
       let teamScores = loadedScores.get(teamKey) || [];
       
       // Check if player already exists in team scores
-      const playerIndex = teamScores.findIndex((p: BestBallPlayerScore) => p.playerId === playerId);
+      const playerIndex = teamScores.findIndex(p => p.playerId === playerId);
       
       if (playerIndex >= 0) {
         // Update existing player score
@@ -481,16 +436,11 @@ const EnhancedMatchScorecard = ({
       updateBestBallScores(hole.number, loadedScores);
     });
     
-  }, [existingPlayerScores, holes, aviatorPlayersList, producerPlayersList]);
+  }, [existingPlayerScores, holes, playerScores, matchId, aviatorPlayersList, producerPlayersList]);
   
   // Load handicap strokes for all players on all holes
   useEffect(() => {
     if (!isBestBall || !matchData?.roundId) return;
-    
-    // Skip if we've already loaded handicap strokes
-    if (handicapStrokesLoaded.current) return;
-    
-    console.log("Loading handicap strokes for all players");
     
     // Function to load handicap data for a player
     const loadPlayerHandicapData = async (player: Player) => {
@@ -542,8 +492,9 @@ const EnhancedMatchScorecard = ({
       loadPlayerHandicapData(player);
     });
     
-    // Mark as loaded
-    handicapStrokesLoaded.current = true;
+    // The handicap dots need to be visible immediately when handicap strokes are calculated
+    // We need to make sure playerScores is correctly populated with handicapStrokes
+    // even before any actual scores are entered
     
   }, [matchData?.roundId, isBestBall, aviatorPlayersList, producerPlayersList, holes, playerHandicaps]);
 
@@ -728,26 +679,7 @@ const EnhancedMatchScorecard = ({
     return value !== null ? value.toString() : "";
   };
 
-  // Helper function to safely get player score value with null checks
-  const safeGetPlayerScoreValue = (scores: BestBallPlayerScore[] | undefined): string => {
-    if (!scores || scores.length === 0) return "";
-    const score = scores[0].score;
-    return score !== null && score !== undefined ? score.toString() : "";
-  };
-
-  // Helper function to safely get handicap strokes with stronger typing
-  const safeGetHandicapStrokes = (scores: BestBallPlayerScore[] | undefined): number => {
-    if (!scores || scores.length === 0) return 0;
-    return scores[0].handicapStrokes || 0;
-  };
-
-  // Helper function to safely get net score with stronger typing
-  const safeGetNetScore = (scores: BestBallPlayerScore[] | undefined): number | null => {
-    if (!scores || scores.length === 0) return null;
-    return scores[0].netScore || null;
-  };
-
-  // Fix "Object is possibly 'undefined'" errors in the getPlayerScoreValue function
+  // For Best Ball format, get an individual player's score
   const getPlayerScoreValue = (
     holeNumber: number,
     playerName: string,
@@ -815,114 +747,7 @@ const EnhancedMatchScorecard = ({
     }, 100);
   };
 
-  // Reference to track if we've initialized scores from local storage
-  const localStorageLoaded = useRef(false);
-  
-  // Function to sync pending scores from local storage
-  const syncPendingScores = async () => {
-    try {
-      const pendingScores = getPendingScores();
-      if (pendingScores.length === 0) return;
-      
-      console.log(`Attempting to sync ${pendingScores.length} pending scores`);
-      
-      const failedScores: string[] = [];
-      
-      for (const scoreKey of pendingScores) {
-        try {
-          const scoreData = getScoreFromLocalStorage(scoreKey);
-          if (!scoreData || !scoreData.matchId) continue; // Skip invalid data
-          
-          // Attempt to save to server
-          await saveScoreToServer(scoreData);
-          
-          // Mark as synced in local storage
-          markScoreAsSynced(scoreKey);
-        } catch (error) {
-          console.error(`Failed to sync score ${scoreKey}:`, error);
-          failedScores.push(scoreKey);
-        }
-      }
-      
-      console.log(`Synced ${pendingScores.length - failedScores.length} scores, ${failedScores.length} failed`);
-      
-      // Refresh data if any scores were synced
-      if (pendingScores.length !== failedScores.length) {
-        queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
-        queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
-      }
-    } catch (error) {
-      console.error("Error syncing pending scores:", error);
-    }
-  };
-  
-  // Helper function to save score to server
-  const saveScoreToServer = async (score: {
-    matchId: number;
-    playerId: number;
-    holeNumber: number;
-    score: number | null;
-    handicapStrokes?: number;
-    netScore?: number | null;
-  }) => {
-    // Ensure handicapStrokes is never undefined
-    const scoreToSave = {
-      ...score,
-      handicapStrokes: score.handicapStrokes || 0,
-      netScore: score.netScore || null
-    };
-    
-    // First try best_ball_player_scores
-    const bestBallResponse = await fetch('/api/best-ball-scores', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(scoreToSave),
-    });
-    
-    if (!bestBallResponse.ok) {
-      console.warn('Failed to save to best_ball_player_scores, will retry later');
-    }
-    
-    // Always try to save to player_scores table for redundancy if score is not null
-    if (score.score !== null) {
-      try {
-        await apiRequest("POST", `/api/player-scores`, {
-          playerId: score.playerId,
-          matchId: score.matchId,
-          holeNumber: score.holeNumber,
-          score: score.score,
-          tournamentId: matchData?.tournamentId
-        });
-      } catch (error) {
-        console.warn("Failed to save to player_scores table:", error);
-      }
-    }
-    
-    return bestBallResponse;
-  };
-  
-  // Attempt to sync pending scores when component mounts or network is restored
-  useEffect(() => {
-    // Try to sync on component mount
-    syncPendingScores();
-    
-    // Set up network status listener to sync when back online
-    const handleOnline = () => {
-      console.log("Network connection restored, syncing pending scores");
-      syncPendingScores();
-    };
-    
-    window.addEventListener('online', handleOnline);
-    
-    // Clean up
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
-  }, [matchId]);
-
-  // Mutation for saving individual scores with offline support
+  // Mutation for saving individual scores
   const saveScoreMutation = useMutation({
     mutationFn: async (score: {
       matchId: number;
@@ -932,96 +757,57 @@ const EnhancedMatchScorecard = ({
       handicapStrokes: number;
       netScore: number | null;
     }) => {
-      // Always save to local storage first for guaranteed persistence
-      saveScoreToLocalStorage(score);
+      // Save to best_ball_player_scores table
+      const bestBallResponse = await fetch('/api/best-ball-scores', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(score),
+      });
       
-      // Also update the state immediately to ensure UI consistency
-      const player = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === score.playerId);
-      
-      if (player) {
-        const teamKey = `${score.holeNumber}-${player.teamId === 1 ? 'aviator' : 'producer'}`;
-        const playerKey = `${score.holeNumber}-${player.name}`;
-        
-        const scoreObj = {
-          player: player.name,
-          score: score.score,
-          teamId: player.teamId === 1 ? 'aviator' : 'producer',
-          playerId: player.id,
-          handicapStrokes: score.handicapStrokes,
-          netScore: score.netScore
-        };
-        
-        // Update state immediately without waiting for server
-        setPlayerScores(prev => {
-          const newScores = new Map(prev);
-          
-          // Update team scores
-          const teamScores = newScores.get(teamKey) || [];
-          const playerIndex = teamScores.findIndex(s => s.playerId === player.id);
-          
-          if (playerIndex >= 0) {
-            teamScores[playerIndex] = scoreObj;
-          } else {
-            teamScores.push(scoreObj);
-          }
-          
-          newScores.set(teamKey, teamScores);
-          
-          // Update player score
-          newScores.set(playerKey, [scoreObj]);
-          
-          return newScores;
-        });
+      if (!bestBallResponse.ok) {
+        throw new Error('Failed to save best ball score');
       }
       
-      try {
-        // Attempt to save to server
-        const response = await saveScoreToServer(score);
-        return response.json();
-      } catch (error) {
-        console.error("Failed to save score to server:", error);
-        // Even though server save failed, we've saved to local storage and updated state
-        // Return a success response to avoid UI disruption
-        return {
-          message: "Score saved offline. Will sync when connection is restored.",
-          offlineOnly: true,
-          ...score
-        };
+      // Also save to player_scores table for consistency if score is not null
+      if (score.score !== null) {
+        try {
+          await apiRequest("POST", `/api/player-scores`, {
+            playerId: score.playerId,
+            matchId: score.matchId,
+            holeNumber: score.holeNumber,
+            score: score.score,
+            tournamentId: matchData?.tournamentId
+          });
+        } catch (error) {
+          console.error("Failed to save to player_scores table:", error);
+          // Continue execution - don't fail the whole operation
+        }
       }
+      
+      return bestBallResponse.json();
     },
     onSuccess: () => {
-      // Don't invalidate queries immediately to avoid flickering
-      // Instead, use a debounced invalidation
-      clearTimeout(invalidationTimer);
-      invalidationTimer = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
-        queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
-      }, 2000);
+      queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
     },
     onError: (error) => {
       console.error('Error saving score:', error);
-      // Notify user of error but don't disrupt experience
-      console.warn('Failed to save score to server. Score is saved offline and will sync when connection is restored.');
+      // Notify user of error
+      alert('Failed to save score. Please try again.');
     },
   });
 
-  // Reference to track if we've already loaded scores to prevent infinite loops
-  const individualScoresLoaded = useRef(false);
-
   // Load individual scores into state when they're fetched
   useEffect(() => {
-    // Only process scores if they exist and haven't been loaded yet
-    if (Array.isArray(individualScores) && individualScores.length > 0 && !individualScoresLoaded.current) {
+    if (Array.isArray(individualScores) && individualScores.length > 0) {
       console.log("Loading scores from best_ball_player_scores table:", individualScores.length, "scores found");
-      
-      // Set flag to prevent infinite loops
-      individualScoresLoaded.current = true;
-      
       const newPlayerScores = new Map();
-      const allParticipants = [...aviatorPlayersList, ...producerPlayersList];
       
-      individualScores.forEach((score: any) => {
-        const player = allParticipants.find((p: Player) => p.id === score.playerId);
+      individualScores.forEach(score => {
+        const player = [...aviatorPlayersList, ...producerPlayersList]
+          .find(p => p.id === score.playerId);
         
         if (player) {
           const teamKey = `${score.holeNumber}-${player.teamId === 1 ? 'aviator' : 'producer'}`;
@@ -1038,15 +824,7 @@ const EnhancedMatchScorecard = ({
           
           // Update team scores
           const teamScores = newPlayerScores.get(teamKey) || [];
-          
-          // Check if player already exists in team scores
-          const existingIndex = teamScores.findIndex((s: any) => s.playerId === score.playerId);
-          if (existingIndex >= 0) {
-            teamScores[existingIndex] = scoreObj;
-          } else {
-            teamScores.push(scoreObj);
-          }
-          
+          teamScores.push(scoreObj);
           newPlayerScores.set(teamKey, teamScores);
           
           // Update player-specific scores
@@ -1054,14 +832,11 @@ const EnhancedMatchScorecard = ({
         }
       });
       
-      // Only update state if we actually have new scores
-      if (newPlayerScores.size > 0) {
-        setPlayerScores(newPlayerScores);
-      }
+      setPlayerScores(newPlayerScores);
     }
   }, [individualScores, aviatorPlayersList, producerPlayersList]);
   
-  // Fix for: Type 'MapIterator<[string, BestBallPlayerScore[]]>' can only be iterated through
+  // Define updateBestBallScores before using it in useEffect
   const updateBestBallScores = (
     holeNumber: number,
     currentScores: Map<string, BestBallPlayerScore[]>,
@@ -1071,21 +846,15 @@ const EnhancedMatchScorecard = ({
     // Get all player scores for this hole
     const playerScoresForHole: BestBallPlayerScore[] = [];
     
-    // Extract team scores from the map using Array.from instead of iterator
-    Array.from(currentScores.entries()).forEach(([key, scores]) => {
+    // Extract team scores from the map
+    for (const [key, scores] of currentScores.entries()) {
       if (key.startsWith(`${holeNumber}-`) && !key.includes("-aviator") && !key.includes("-producer")) {
         // This is a player's key for this hole
         if (scores && scores.length > 0) {
-          // Make sure the score has all required fields
-          const scoreWithDefaults = {
-            ...scores[0],
-            handicapStrokes: scores[0].handicapStrokes || 0,
-            netScore: scores[0].netScore || (scores[0].score !== null ? scores[0].score - (scores[0].handicapStrokes || 0) : null)
-          };
-          playerScoresForHole.push(scoreWithDefaults);
+          playerScoresForHole.push(scores[0]);
         }
       }
-    });
+    }
     
     // Update the match scores
     if (playerScoresForHole.length > 0) {
@@ -1093,27 +862,18 @@ const EnhancedMatchScorecard = ({
     }
   };
 
-  // Reference for fallback scores loading
-  const fallbackScoresLoaded = useRef(false);
-  
-  // Fix for: Type 'Set<any>' can only be iterated through
   // Fallback mechanism to load scores from player_scores if best_ball_scores aren't available
   useEffect(() => {
-    // Only run if best ball match, we have existing player scores, we don't have individual scores, and we haven't loaded yet
+    // Only run if best ball match, we have existing player scores, and we don't have individual scores
     if (isBestBall && 
         Array.isArray(existingPlayerScores) && existingPlayerScores.length > 0 && 
-        (!Array.isArray(individualScores) || individualScores.length === 0) &&
-        !fallbackScoresLoaded.current) {
-      
-      // Mark as loaded to prevent infinite loops
-      fallbackScoresLoaded.current = true;
-      
+        (!Array.isArray(individualScores) || individualScores.length === 0)) {
       console.log("Fallback: Loading scores from player_scores table:", existingPlayerScores.length, "scores found");
       const newPlayerScores = new Map();
       
       existingPlayerScores.forEach((score: any) => {
         const player = [...aviatorPlayersList, ...producerPlayersList]
-          .find((p: Player) => p.id === score.playerId);
+          .find(p => p.id === score.playerId);
         
         if (player) {
           const teamKey = `${score.holeNumber}-${player.teamId === 1 ? 'aviator' : 'producer'}`;
@@ -1153,24 +913,19 @@ const EnhancedMatchScorecard = ({
         }
       });
       
-      // Only update if we have scores
-      if (newPlayerScores.size > 0) {
+      // Only update if we have scores and the main useEffect hasn't populated scores yet
+      if (newPlayerScores.size > 0 && playerScores.size === 0) {
         setPlayerScores(newPlayerScores);
         
         // Also update best ball scores for each hole
-        // Fix the Set iteration by converting to array first
-        const uniqueHoleSet = new Set<number>();
-        existingPlayerScores.forEach((s: any) => {
-          if (s.holeNumber) uniqueHoleSet.add(s.holeNumber);
-        });
-        const uniqueHoles = Array.from(uniqueHoleSet);
-        
+        const uniqueHoles = [...new Set(existingPlayerScores.map((s: any) => s.holeNumber))];
         uniqueHoles.forEach(holeNumber => {
           updateBestBallScores(holeNumber, newPlayerScores);
         });
       }
     }
-  }, [existingPlayerScores, individualScores, aviatorPlayersList, producerPlayersList, isBestBall, holes]);
+  }, [existingPlayerScores, individualScores, aviatorPlayersList, producerPlayersList, isBestBall, 
+      holes, playerScores, getPlayerCourseHandicap]);
 
   // Update handlePlayerScoreChange to use the mutation
   const handlePlayerScoreChange = async (
@@ -1192,7 +947,7 @@ const EnhancedMatchScorecard = ({
         numValue = parsed;
       }
     }
-    
+
     const playerId = teamId === "aviator"
       ? aviatorPlayersList.find((p: any) => p.name === playerName)?.id || 0
       : producerPlayersList.find((p: any) => p.name === playerName)?.id || 0;
@@ -1470,53 +1225,8 @@ const EnhancedMatchScorecard = ({
     };
   }, [holes, scores]);
 
-  // Helper function for getting player name from id
-  const getPlayerName = (playerId: number): string => {
-    // Use explicit type for player to fix "Parameter 'p' implicitly has an 'any' type"
-    const player = [...aviatorPlayersList, ...producerPlayersList].find((p: Player) => p.id === playerId);
-    return player?.name || `Player ${playerId}`;
-  };
-
-  // Helper function to get handicap indicators safely
-  const renderHandicapIndicators = (holeNumber: number, playerName: string) => {
-    const key = `${holeNumber}-${playerName}`;
-    const scores = playerScores.get(key);
-    const handicapStrokes = safeGetHandicapStrokes(scores);
-    
-    if (handicapStrokes <= 0) return null;
-    
-    return (
-      <div className="handicap-strokes">
-        {Array.from({ length: handicapStrokes }).map((_, i) => (
-          <div key={i} className="handicap-indicator"></div>
-        ))}
-      </div>
-    );
-  };
-  
-  // Helper to determine if score input should show handicap stroke styling
-  const hasHandicapStroke = (holeNumber: number, playerName: string): boolean => {
-    const key = `${holeNumber}-${playerName}`;
-    return safeGetHandicapStrokes(playerScores.get(key)) > 0;
-  };
-
-  // If this is a best ball match, use the dedicated BestBallScorecard component
-  if (isBestBall) {
-    return (
-      <BestBallScorecard
-        matchId={matchId}
-        roundId={matchData?.roundId || 0}
-        holes={holes}
-        participants={participants || []}
-        allPlayers={allPlayers}
-        isAdmin={isAdmin}
-      />
-    );
-  }
-
-  // Regular match play scoring continues below
   return (
-    <div className="overflow-x-auto">
+    <div className="scorecard-container">
       <div>
         {/* All 18 Holes in a single table with horizontal scrolling */}
         <table className="w-full text-sm scorecard-table">
@@ -1626,18 +1336,28 @@ const EnhancedMatchScorecard = ({
                       return (
                         <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
                           <div className="relative">
-                            {/* Handicap Strokes Indicators - Use the helper function */}
-                            {renderHandicapIndicators(hole.number, player.name)}
+                            {/* Handicap Strokes Indicators - Always show if available */}
+                            {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                              <div className="handicap-strokes">
+                                {Array.from({ length: playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0 }).map((_, i) => (
+                                  <div key={i} className="handicap-indicator"></div>
+                                ))}
+                              </div>
+                            )}
                             <input
                               type="tel"
                               inputMode="numeric"
                               pattern="[0-9]*"
-                              data-strokes={safeGetHandicapStrokes(playerScores.get(`${hole.number}-${player.name}`))}
+                              data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
                               className={`score-input w-8 h-8 text-center border border-gray-300 rounded 
                                 ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed" : ""} 
                                 ${!isLowest ? "non-counting-score" : ""}
-                                ${hasHandicapStroke(hole.number, player.name) ? "handicap-stroke" : ""}`}
-                              value={safeGetPlayerScoreValue(playerScores.get(`${hole.number}-${player.name}`))}
+                                ${playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 ? "handicap-stroke" : ""}`}
+                              value={getPlayerScoreValue(
+                                hole.number,
+                                player.name,
+                                "aviator",
+                              )}
                               onChange={(e) =>
                                 handlePlayerScoreChange(
                                   hole.number,
@@ -1652,10 +1372,10 @@ const EnhancedMatchScorecard = ({
                               disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                             />
                             {/* Net Score Display - only show when score is entered */}
-                            {safeGetNetScore(playerScores.get(`${hole.number}-${player.name}`)) !== null && 
-                             safeGetHandicapStrokes(playerScores.get(`${hole.number}-${player.name}`)) > 0 && (
+                            {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
+                             playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
                               <span className="net-score">
-                                ({safeGetNetScore(playerScores.get(`${hole.number}-${player.name}`))})
+                                ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
                               </span>
                             )}
                           </div>
@@ -1676,17 +1396,27 @@ const EnhancedMatchScorecard = ({
                                   <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
                                     <div className="relative">
                                       {/* Handicap Strokes Indicators */}
-                                      {renderHandicapIndicators(hole.number, player.name)}
+                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                                        <div className="handicap-strokes">
+                                          {Array.from({ length: playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0 }).map((_, i) => (
+                                            <div key={i} className="handicap-indicator"></div>
+                                          ))}
+                                        </div>
+                                      )}
                                       <input
                                         type="tel"
                                         inputMode="numeric"
                                         pattern="[0-9]*"
-                                        data-strokes={safeGetHandicapStrokes(playerScores.get(`${hole.number}-${player.name}`))}
+                                        data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
                                         className={`score-input w-8 h-8 text-center border border-gray-300 rounded 
                                           ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed" : ""} 
                                           ${!isLowest ? "non-counting-score" : ""}
-                                          ${hasHandicapStroke(hole.number, player.name) ? "handicap-stroke" : ""}`}
-                                        value={safeGetPlayerScoreValue(playerScores.get(`${hole.number}-${player.name}`))}
+                                          ${playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 ? "handicap-stroke" : ""}`}
+                                        value={getPlayerScoreValue(
+                                          hole.number,
+                                          player.name,
+                                          "aviator",
+                                        )}
                                         onChange={(e) =>
                                           handlePlayerScoreChange(
                                             hole.number,
@@ -1701,10 +1431,10 @@ const EnhancedMatchScorecard = ({
                                         disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
-                                      {safeGetNetScore(playerScores.get(`${hole.number}-${player.name}`)) !== null && 
-                                       safeGetHandicapStrokes(playerScores.get(`${hole.number}-${player.name}`)) > 0 && (
+                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
+                                       playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
                                         <span className="net-score">
-                                          ({safeGetNetScore(playerScores.get(`${hole.number}-${player.name}`))})
+                                          ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
                                         </span>
                                       )}
                                     </div>
@@ -1737,7 +1467,7 @@ const EnhancedMatchScorecard = ({
                               }`}>
                                 {getScoreInputValue(hole.number, "aviator") || ""}
                               </div>
-                          ) : canEditScores ? (
+                            ) : canEditScores ? (
                               <input
                                 type="tel"
                                 inputMode="numeric"
@@ -1758,12 +1488,12 @@ const EnhancedMatchScorecard = ({
                                 max="12"
                                 disabled={isHoleGreyedOut(hole.number) || locked}
                               />
-                          ) : (
-                            <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                              getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
-                            }`}>
-                              {getScoreInputValue(hole.number, "aviator") || ""}
-                            </div>
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "aviator") || ""}
+                              </div>
                             )}
                           </td>
                         ))}
@@ -1782,7 +1512,7 @@ const EnhancedMatchScorecard = ({
                               }`}>
                                 {getScoreInputValue(hole.number, "aviator") || ""}
                               </div>
-                          ) : canEditScores ? (
+                            ) : canEditScores ? (
                               <input
                                 type="tel"
                                 inputMode="numeric"
@@ -1803,12 +1533,12 @@ const EnhancedMatchScorecard = ({
                                 max="12"
                                 disabled={isHoleGreyedOut(hole.number) || locked}
                               />
-                          ) : (
-                            <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                              getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
-                            }`}>
-                              {getScoreInputValue(hole.number, "aviator") || ""}
-                            </div>
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "aviator") ? "bg-aviator text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "aviator") || ""}
+                              </div>
                             )}
                           </td>
                         ))}
@@ -1871,7 +1601,7 @@ const EnhancedMatchScorecard = ({
                               }`}>
                                 {getScoreInputValue(hole.number, "producer") || ""}
                               </div>
-                          ) : canEditScores ? (
+                            ) : canEditScores ? (
                               <input
                                 type="tel"
                                 inputMode="numeric"
@@ -1892,12 +1622,12 @@ const EnhancedMatchScorecard = ({
                                 max="12"
                                 disabled={isHoleGreyedOut(hole.number) || locked}
                               />
-                          ) : (
-                            <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                              getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
-                            }`}>
-                              {getScoreInputValue(hole.number, "producer") || ""}
-                            </div>
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "producer") || ""}
+                              </div>
                             )}
                           </td>
                         ))}
@@ -1916,7 +1646,7 @@ const EnhancedMatchScorecard = ({
                               }`}>
                                 {getScoreInputValue(hole.number, "producer") || ""}
                               </div>
-                          ) : canEditScores ? (
+                            ) : canEditScores ? (
                               <input
                                 type="tel"
                                 inputMode="numeric"
@@ -1935,14 +1665,14 @@ const EnhancedMatchScorecard = ({
                                 }
                                 min="1"
                                 max="12"
-                              disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
-                            />
-                          ) : (
-                            <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
-                              getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
-                            }`}>
-                              {getScoreInputValue(hole.number, "producer") || ""}
-                            </div>
+                                disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
+                              />
+                            ) : (
+                              <div className={`score-display w-16 h-8 inline-flex items-center justify-center border border-gray-300 rounded ${
+                                getScoreInputValue(hole.number, "producer") ? "bg-producer text-white" : "bg-white text-black"
+                              }`}>
+                                {getScoreInputValue(hole.number, "producer") || ""}
+                              </div>
                             )}
                           </td>
                         ))}
@@ -1994,17 +1724,27 @@ const EnhancedMatchScorecard = ({
                                   <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
                                     <div className="relative">
                                       {/* Handicap Strokes Indicators */}
-                                    {renderHandicapIndicators(hole.number, player.name)}
+                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                                        <div className="handicap-strokes">
+                                          {Array.from({ length: playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0 }).map((_, i) => (
+                                            <div key={i} className="handicap-indicator"></div>
+                                          ))}
+                                        </div>
+                                      )}
                                       <input
                                         type="tel"
                                         inputMode="numeric"
                                         pattern="[0-9]*"
-                                      data-strokes={safeGetHandicapStrokes(playerScores.get(`${hole.number}-${player.name}`))}
+                                        data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
                                         className={`score-input w-8 h-8 text-center border border-gray-300 rounded 
                                           ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed" : ""} 
                                           ${!isLowest ? "non-counting-score" : ""}
-                                        ${hasHandicapStroke(hole.number, player.name) ? "handicap-stroke" : ""}`}
-                                      value={safeGetPlayerScoreValue(playerScores.get(`${hole.number}-${player.name}`))}
+                                          ${playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 ? "handicap-stroke" : ""}`}
+                                        value={getPlayerScoreValue(
+                                          hole.number,
+                                          player.name,
+                                          "producer",
+                                        )}
                                         onChange={(e) =>
                                           handlePlayerScoreChange(
                                             hole.number,
@@ -2016,13 +1756,13 @@ const EnhancedMatchScorecard = ({
                                         }
                                         min="1"
                                         max="12"
-                                      disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
+                                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
-                                    {safeGetNetScore(playerScores.get(`${hole.number}-${player.name}`)) !== null && 
-                                     safeGetHandicapStrokes(playerScores.get(`${hole.number}-${player.name}`)) > 0 && (
+                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
+                                       playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
                                         <span className="net-score">
-                                        ({safeGetNetScore(playerScores.get(`${hole.number}-${player.name}`))})
+                                          ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
                                         </span>
                                       )}
                                     </div>
@@ -2043,17 +1783,27 @@ const EnhancedMatchScorecard = ({
                                   <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
                                     <div className="relative">
                                       {/* Handicap Strokes Indicators */}
-                                    {renderHandicapIndicators(hole.number, player.name)}
+                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                                        <div className="handicap-strokes">
+                                          {Array.from({ length: playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0 }).map((_, i) => (
+                                            <div key={i} className="handicap-indicator"></div>
+                                          ))}
+                                        </div>
+                                      )}
                                       <input
                                         type="tel"
                                         inputMode="numeric"
                                         pattern="[0-9]*"
-                                      data-strokes={safeGetHandicapStrokes(playerScores.get(`${hole.number}-${player.name}`))}
+                                        data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
                                         className={`score-input w-8 h-8 text-center border border-gray-300 rounded 
                                           ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed" : ""} 
                                           ${!isLowest ? "non-counting-score" : ""}
-                                        ${hasHandicapStroke(hole.number, player.name) ? "handicap-stroke" : ""}`}
-                                      value={safeGetPlayerScoreValue(playerScores.get(`${hole.number}-${player.name}`))}
+                                          ${playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 ? "handicap-stroke" : ""}`}
+                                        value={getPlayerScoreValue(
+                                          hole.number,
+                                          player.name,
+                                          "producer",
+                                        )}
                                         onChange={(e) =>
                                           handlePlayerScoreChange(
                                             hole.number,
@@ -2065,13 +1815,13 @@ const EnhancedMatchScorecard = ({
                                         }
                                         min="1"
                                         max="12"
-                                      disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
+                                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
-                                    {safeGetNetScore(playerScores.get(`${hole.number}-${player.name}`)) !== null && 
-                                     safeGetHandicapStrokes(playerScores.get(`${hole.number}-${player.name}`)) > 0 && (
+                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
+                                       playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
                                         <span className="net-score">
-                                        ({safeGetNetScore(playerScores.get(`${hole.number}-${player.name}`))})
+                                          ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
                                         </span>
                                       )}
                                     </div>

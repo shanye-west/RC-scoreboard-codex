@@ -893,143 +893,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Best Ball Score API with synchronized score updates
-  // Add a savePlayerScore helper for routes.ts
-  const savePlayerScore = async (data) => {
-    const existingScore = await storage.getPlayerScore(
-      data.playerId,
-      data.matchId,
-      data.holeNumber
-    );
-
-    if (existingScore) {
-      return storage.updatePlayerScore(existingScore.id, data);
-    } else {
-      return storage.createPlayerScore(data);
-    }
-  };
-
+  // Best Ball Score API
   app.post('/api/best-ball-scores', async (req, res) => {
     try {
       const score = insertBestBallScoreSchema.parse(req.body);
-      
-      // Get the match to find the round
-      const match = await storage.getMatch(score.matchId);
-      if (!match || !match.roundId) {
-        throw new Error('Match not found or no round associated');
-      }
-      
-      // Get or calculate handicap strokes
-      let handicapStrokes = score.handicapStrokes || 0;
-      
-      if (handicapStrokes === 0) {
-        try {
-          // First check if this player already has a course handicap
-          const playerHandicap = await storage.getPlayerCourseHandicap(
-            score.playerId,
-            match.roundId
-          );
-          
-          if (playerHandicap && playerHandicap.courseHandicap > 0) {
-            // Get the hole details to check its handicap rank
-            const hole = await storage.getHole(match.roundId, score.holeNumber);
-            
-            if (hole && hole.handicapRank) {
-              // Calculate strokes based on course handicap and hole rank
-              handicapStrokes = await storage.getHoleHandicapStrokes(
-                score.playerId,
-                match.roundId,
-                score.holeNumber
-              );
-              
-              console.log(`Calculated ${handicapStrokes} handicap strokes for player ${score.playerId} on hole ${score.holeNumber}`);
-            }
-          }
-          
-          // Update the score object with calculated handicap strokes
-          score.handicapStrokes = handicapStrokes;
-        } catch (handicapError) {
-          console.warn("Warning: Failed to calculate handicap strokes:", handicapError);
-          score.handicapStrokes = 0;
-        }
-      }
-      
-      // Always calculate net score if a score is provided
-      if (score.score !== null) {
-        score.netScore = Math.max(0, score.score - handicapStrokes);
-      }
-      
-      // Step 1: Save to best_ball_player_scores table with handicap info
       const result = await storage.saveBestBallScore(score);
-      
-      // Step 2: Ensure player_scores is also updated for consistency
-      if (score.score !== null) {
-        try {
-          await savePlayerScore({
-            playerId: score.playerId,
-            matchId: score.matchId,
-            holeNumber: score.holeNumber,
-            score: score.score,
-            tournamentId: null,
-            handicapStrokes: score.handicapStrokes || 0,
-            netScore: score.netScore || score.score
-          });
-        } catch (playerScoreError) {
-          console.warn("Warning: Failed to update player_scores table:", playerScoreError);
-          // Continue execution even if this fails
-        }
-      }
-      
-      // Step 3: Update team scores in the scores table
-      try {
-        // Get all player scores for this hole
-        const playerScores = await storage.getPlayerScoresByHole(score.matchId, score.holeNumber);
-        
-        // Get match participants to determine teams
-        const participants = await storage.getMatchParticipants(score.matchId);
-        
-        if (participants && participants.length > 0) {
-          const aviatorScores = playerScores.filter(ps => 
-            participants.some(p => p.playerId === ps.playerId && p.team === 'aviator')
-          );
-          
-          const producerScores = playerScores.filter(ps => 
-            participants.some(p => p.playerId === ps.playerId && p.team === 'producer')
-          );
-          
-          // Calculate best scores for each team
-          const aviatorBestScore = aviatorScores.length > 0 ? 
-            Math.min(...aviatorScores.map(s => s.score)) : null;
-            
-          const producerBestScore = producerScores.length > 0 ? 
-            Math.min(...producerScores.map(s => s.score)) : null;
-          
-          // Determine winner
-          let winningTeam = null;
-          if (aviatorBestScore !== null && producerBestScore !== null) {
-            winningTeam = aviatorBestScore < producerBestScore ? 'aviator' : 
-                          producerBestScore < aviatorBestScore ? 'producer' : 'tie';
-          }
-          
-          // Update or insert team score
-          await storage.saveTeamScore({
-            matchId: score.matchId,
-            holeNumber: score.holeNumber,
-            aviatorScore: aviatorBestScore,
-            producerScore: producerBestScore,
-            winningTeam: winningTeam,
-            matchStatus: null,
-            tournamentId: null
-          });
-        }
-      } catch (teamScoreError) {
-        console.warn("Warning: Failed to update team scores:", teamScoreError);
-        // Continue execution even if this fails
-      }
       
       // Broadcast the update
       broadcast("best-ball-score-updated", result[0]);
-      broadcast("scores-updated", { matchId: score.matchId, holeNumber: score.holeNumber });
       
       res.json(result[0]);
     } catch (error) {
@@ -1047,55 +918,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(matchId)) {
         return res.status(400).json({ error: 'Invalid match ID' });
       }
-      
-      // Get stored scores with handicap information
       const scores = await storage.getBestBallScores(matchId);
-      
-      // Get the match to find the round
-      const match = await storage.getMatch(matchId);
-      if (!match || !match.roundId) {
-        return res.status(404).json({ error: 'Match not found or no round associated' });
-      }
-      
-      // Process each score to ensure handicap data is present and correct
-      const processedScores = await Promise.all(scores.map(async (score) => {
-        // Only recalculate handicap if it's missing or 0
-        if (score.handicapStrokes === null || score.handicapStrokes === undefined || score.handicapStrokes === 0) {
-          // Calculate handicap strokes for this player on this hole
-          const strokes = await storage.getHoleHandicapStrokes(
-            score.playerId,
-            match.roundId,
-            score.holeNumber
-          );
-          
-          // Only update database if the value has changed
-          if (strokes !== score.handicapStrokes) {
-            score.handicapStrokes = strokes;
-            
-            // Recalculate net score if needed
-            if (score.score !== null) {
-              score.netScore = Math.max(0, score.score - score.handicapStrokes);
-            }
-            
-            // Update in database (but don't wait for response to avoid slowing down API)
-            storage.saveBestBallScore({
-              matchId: score.matchId,
-              playerId: score.playerId,
-              holeNumber: score.holeNumber,
-              score: score.score,
-              handicapStrokes: score.handicapStrokes,
-              netScore: score.netScore
-            }).catch(err => {
-              console.error(`Failed to update handicap strokes: ${err.message}`);
-            });
-          }
-        }
-        
-        return score;
-      }));
-      
-      // Return the processed scores 
-      res.json(processedScores);
+      res.json(scores);
     } catch (error) {
       console.error('Error fetching best ball scores:', error);
       res.status(500).json({ error: 'Failed to fetch scores' });
@@ -1900,15 +1724,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sportsbook API endpoints
   
   // Bet Types API
-  app.get("/api/bet-types", async (req, res) => {
+  app.get('/api/bet-types', async (req, res) => {
     try {
-      console.log("API: Fetching bet types");
       const betTypes = await storage.getBetTypes();
-      console.log("API: Bet types fetched:", betTypes);
       res.json(betTypes);
     } catch (error) {
-      console.error("Error fetching bet types:", error);
-      res.status(500).json({ message: "Failed to fetch bet types" });
+      console.error("Error getting bet types:", error);
+      res.status(500).json({ message: "Failed to get bet types" });
     }
   });
 
