@@ -61,6 +61,7 @@ interface MatchScorecardProps {
     playerScores: BestBallPlayerScore[],
   ) => void;
   participants?: any[]; // Match participants
+  players?: any[]; // All players
 }
 
 const EnhancedMatchScorecard = ({
@@ -72,19 +73,27 @@ const EnhancedMatchScorecard = ({
   locked = false,
   onScoreUpdate,
   onBestBallScoreUpdate,
+  participants: propParticipants,
+  players: propPlayers,
 }: MatchScorecardProps) => {
   const isBestBall = matchType.includes("Best Ball");
   const queryClient = useQueryClient();
 
-  // Fetch match participants
-  const { data: participants = [] } = useQuery<any[]>({
+  // Fetch match participants if not provided via props
+  const { data: fetchedParticipants = [] } = useQuery<any[]>({
     queryKey: [`/api/match-players?matchId=${matchId}`],
+    enabled: !propParticipants || propParticipants.length === 0,
   });
 
-  // Fetch all players for reference
-  const { data: allPlayers = [] } = useQuery<any[]>({
+  // Fetch all players for reference if not provided via props
+  const { data: fetchedPlayers = [] } = useQuery<any[]>({
     queryKey: ["/api/players"],
+    enabled: !propPlayers || propPlayers.length === 0,
   });
+  
+  // Use props if provided, otherwise use fetched data
+  const participants = propParticipants && propParticipants.length > 0 ? propParticipants : fetchedParticipants;
+  const allPlayers = propPlayers && propPlayers.length > 0 ? propPlayers : fetchedPlayers;
   
   // Fetch information about the match's round
   const { data: matchData } = useQuery<any>({
