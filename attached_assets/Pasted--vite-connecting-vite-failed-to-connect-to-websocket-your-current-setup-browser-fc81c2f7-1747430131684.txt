@@ -1,0 +1,65 @@
+[vite] connecting...
+[vite] failed to connect to websocket.
+your current setup:
+  (browser) fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/ <--[HTTP]--> localhost:5173/ (server)
+  (browser) fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev:/ <--[WebSocket (failing)]--> localhost:5173/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr .
+WebSocket connection established
+Submitting round with data: 
+Object {name: "Shanye West", matchType: "2-man Team Best Ball", courseId: 3, courseName: "The Coeur d'Alene Golf Resort", date: "2025-05-16", …}
+Cannot read properties of undefined (reading 'netScore')
+Cannot read properties of undefined (reading 'netScore')
+The above error occurred in the <BestBallScorecard> component:
+
+    at BestBallScorecard (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/components/BestBallScorecard.tsx:26:3)
+    at div
+    at Match (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/pages/Match.tsx:49:18)
+    at Route (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=67d877b3:280:16)
+    at Switch (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=67d877b3:336:17)
+    at Router (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/App.tsx?v=Ykg5XejoI-KFc18VAvG47:41:31)
+    at main
+    at div
+    at Layout (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/components/Layout.tsx:24:19)
+    at Provider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BKOR25MY.js?v=67d877b3:38:15)
+    at TooltipProvider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=67d877b3:60:5)
+    at AuthProvider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/hooks/use-auth.tsx:26:32)
+    at QueryClientProvider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=67d877b3:2875:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+
+at BestBallScorecard (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/components/BestBallScorecard.tsx:26:3)
+at div
+at Match (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/pages/Match.tsx:49:18)
+at Route (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=67d877b3:280:16)
+at Switch (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=67d877b3:336:17)
+at Router (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/App.tsx?v=Ykg5XejoI-KFc18VAvG47:41:31)
+at main
+at div
+at Layout (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/components/Layout.tsx:24:19)
+at Provider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BKOR25MY.js?v=67d877b3:38:15)
+at TooltipProvider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=67d877b3:60:5)
+at AuthProvider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/hooks/use-auth.tsx:26:32)
+at QueryClientProvider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=67d877b3:2875:3)
+at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+at t.value (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:17465)
+at new t (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:12630)
+at t.value (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:32766)
+at https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/__replco/static/devtools/eruda/3.2.3/eruda.js:2:34400
+Cannot read properties of undefined (reading 'netScore')
+[vite] 
+TypeError {}
+
+[vite] 
+TypeError {}
+
+[vite] 
+TypeError {}
+
+WebSocket connection closed with code 1005
+Attempting to reconnect WebSocket...
+WebSocket connection established
