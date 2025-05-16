@@ -1,25 +1,92 @@
 import { Router } from 'express';
-import { supabase } from '../lib/supabaseClient';
 import { authenticateUser } from '../middleware/auth';
+import {
+  getBestBallMatch,
+  getBestBallScores,
+  saveBestBallScore,
+  updateBestBallMatchScores,
+  createBestBallMatch,
+  getBestBallMatchesByRound,
+  updateBestBallMatchStatus
+} from '../db/queries/bestBall';
 
 const router = Router();
+
+// Create a new best ball match
+router.post('/matches', authenticateUser, async (req, res) => {
+  try {
+    const { roundId, team1Id, team2Id } = req.body;
+
+    // Check if user is admin
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const match = await createBestBallMatch(roundId, team1Id, team2Id);
+    res.status(201).json(match);
+  } catch (error) {
+    console.error('Error creating best ball match:', error);
+    res.status(500).json({ error: 'Failed to create match' });
+  }
+});
+
+// Get all best ball matches for a round
+router.get('/matches/round/:roundId', async (req, res) => {
+  try {
+    const roundId = parseInt(req.params.roundId);
+    const matches = await getBestBallMatchesByRound(roundId);
+    res.json(matches);
+  } catch (error) {
+    console.error('Error fetching best ball matches:', error);
+    res.status(500).json({ error: 'Failed to fetch matches' });
+  }
+});
+
+// Update match status
+router.patch('/matches/:matchId/status', authenticateUser, async (req, res) => {
+  try {
+    const matchId = parseInt(req.params.matchId);
+    const { status } = req.body;
+
+    // Check if user is admin
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const match = await updateBestBallMatchStatus(matchId, status);
+    res.json(match);
+  } catch (error) {
+    console.error('Error updating match status:', error);
+    res.status(500).json({ error: 'Failed to update match status' });
+  }
+});
+
+// Get best ball match details
+router.get('/matches/:matchId', async (req, res) => {
+  try {
+    const matchId = parseInt(req.params.matchId);
+    const match = await getBestBallMatch(matchId);
+    
+    if (!match) {
+      return res.status(404).json({ error: 'Match not found' });
+    }
+
+    res.json(match);
+  } catch (error) {
+    console.error('Error fetching best ball match:', error);
+    res.status(500).json({ error: 'Failed to fetch match details' });
+  }
+});
 
 // Get best ball scores for a match
 router.get('/best-ball-scores/:matchId', async (req, res) => {
   try {
-    const { matchId } = req.params;
-
-    const { data, error } = await supabase
-      .from('best_ball_player_scores')
-      .select('*')
-      .eq('match_id', matchId);
-
-    if (error) throw error;
-
-    res.json(data);
+    const matchId = parseInt(req.params.matchId);
+    const scores = await getBestBallScores(matchId);
+    res.json(scores);
   } catch (error) {
     console.error('Error fetching best ball scores:', error);
-    res.status(500).json({ error: 'Failed to fetch best ball scores' });
+    res.status(500).json({ error: 'Failed to fetch scores' });
   }
 });
 
@@ -29,35 +96,26 @@ router.post('/best-ball-scores', authenticateUser, async (req, res) => {
     const { matchId, playerId, holeNumber, score, handicapStrokes, netScore } = req.body;
 
     // Check if user is admin
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', req.user.id)
-      .single();
-
-    if (userRole?.role !== 'admin') {
+    if (!req.user?.isAdmin) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const { data, error } = await supabase
-      .from('best_ball_player_scores')
-      .upsert({
-        match_id: matchId,
-        player_id: playerId,
-        hole_number: holeNumber,
-        score,
-        handicap_strokes: handicapStrokes,
-        net_score: netScore
-      })
-      .select()
-      .single();
+    const savedScore = await saveBestBallScore(
+      matchId,
+      playerId,
+      holeNumber,
+      score,
+      handicapStrokes,
+      netScore
+    );
 
-    if (error) throw error;
+    // Update match scores
+    await updateBestBallMatchScores(matchId);
 
-    res.json(data);
+    res.json(savedScore);
   } catch (error) {
     console.error('Error saving best ball score:', error);
-    res.status(500).json({ error: 'Failed to save best ball score' });
+    res.status(500).json({ error: 'Failed to save score' });
   }
 });
 
