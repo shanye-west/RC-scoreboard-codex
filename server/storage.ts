@@ -2040,8 +2040,9 @@ export class DBStorage implements IStorage {
     }
   }
 
-  // Best Ball Score methods
+  // Best Ball Score methods with enhanced persistence
   async saveBestBallScore(score: InsertBestBallScore) {
+    // Save to best_ball_player_scores table with handicap information
     const existingScore = await db
       .select()
       .from(best_ball_player_scores)
@@ -2070,6 +2071,59 @@ export class DBStorage implements IStorage {
       // Insert new score
       return db
         .insert(best_ball_player_scores)
+        .values({
+          ...score,
+          handicapStrokes: score.handicapStrokes || 0, // Ensure handicap strokes is never null
+          netScore: score.netScore !== undefined ? score.netScore : 
+                  (score.score !== null ? score.score - (score.handicapStrokes || 0) : null)
+        })
+        .returning();
+    }
+  }
+  
+  // Get player scores for a specific hole in a match
+  async getPlayerScoresByHole(matchId: number, holeNumber: number) {
+    return db
+      .select()
+      .from(player_scores)
+      .where(
+        and(
+          eq(player_scores.matchId, matchId),
+          eq(player_scores.holeNumber, holeNumber)
+        )
+      );
+  }
+  
+  // Save a team score to the scores table
+  async saveTeamScore(score: InsertScore) {
+    const existingScore = await db
+      .select()
+      .from(scores)
+      .where(
+        and(
+          eq(scores.matchId, score.matchId),
+          eq(scores.holeNumber, score.holeNumber)
+        )
+      )
+      .limit(1);
+
+    if (existingScore.length > 0) {
+      // Update existing score
+      return db
+        .update(scores)
+        .set({
+          aviatorScore: score.aviatorScore,
+          producerScore: score.producerScore,
+          winningTeam: score.winningTeam,
+          matchStatus: score.matchStatus,
+          tournamentId: score.tournamentId
+        })
+        .where(eq(scores.id, existingScore[0].id))
+        .returning();
+    } else {
+      // Insert new score
+      return db
+        .insert(scores)
         .values(score)
         .returning();
     }

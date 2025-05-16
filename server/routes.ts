@@ -893,14 +893,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Best Ball Score API
+  // Best Ball Score API with synchronized score updates
   app.post('/api/best-ball-scores', async (req, res) => {
     try {
       const score = insertBestBallScoreSchema.parse(req.body);
+      
+      // Step 1: Save to best_ball_player_scores table
       const result = await storage.saveBestBallScore(score);
+      
+      // Step 2: Ensure player_scores is also updated for consistency
+      if (score.score !== null) {
+        try {
+          await storage.savePlayerScore({
+            playerId: score.playerId,
+            matchId: score.matchId,
+            holeNumber: score.holeNumber,
+            score: score.score,
+            tournamentId: null
+          });
+        } catch (playerScoreError) {
+          console.warn("Warning: Failed to update player_scores table:", playerScoreError);
+          // Continue execution even if this fails
+        }
+      }
+      
+      // Step 3: Update team scores in the scores table
+      try {
+        // Get all player scores for this hole
+        const playerScores = await storage.getPlayerScoresByHole(score.matchId, score.holeNumber);
+        
+        // Get match participants to determine teams
+        const participants = await storage.getMatchParticipants(score.matchId);
+        
+        if (participants && participants.length > 0) {
+          const aviatorScores = playerScores.filter(ps => 
+            participants.some(p => p.playerId === ps.playerId && p.team === 'aviator')
+          );
+          
+          const producerScores = playerScores.filter(ps => 
+            participants.some(p => p.playerId === ps.playerId && p.team === 'producer')
+          );
+          
+          // Calculate best scores for each team
+          const aviatorBestScore = aviatorScores.length > 0 ? 
+            Math.min(...aviatorScores.map(s => s.score)) : null;
+            
+          const producerBestScore = producerScores.length > 0 ? 
+            Math.min(...producerScores.map(s => s.score)) : null;
+          
+          // Determine winner
+          let winningTeam = null;
+          if (aviatorBestScore !== null && producerBestScore !== null) {
+            winningTeam = aviatorBestScore < producerBestScore ? 'aviator' : 
+                          producerBestScore < aviatorBestScore ? 'producer' : 'tie';
+          }
+          
+          // Update or insert team score
+          await storage.saveTeamScore({
+            matchId: score.matchId,
+            holeNumber: score.holeNumber,
+            aviatorScore: aviatorBestScore,
+            producerScore: producerBestScore,
+            winningTeam: winningTeam,
+            matchStatus: null,
+            tournamentId: null
+          });
+        }
+      } catch (teamScoreError) {
+        console.warn("Warning: Failed to update team scores:", teamScoreError);
+        // Continue execution even if this fails
+      }
       
       // Broadcast the update
       broadcast("best-ball-score-updated", result[0]);
+      broadcast("scores-updated", { matchId: score.matchId, holeNumber: score.holeNumber });
       
       res.json(result[0]);
     } catch (error) {
