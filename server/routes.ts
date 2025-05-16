@@ -919,28 +919,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error('Match not found or no round associated');
       }
       
-      // Calculate and include handicap strokes
-      if (!score.handicapStrokes) {
+      // Get or calculate handicap strokes
+      let handicapStrokes = score.handicapStrokes || 0;
+      
+      if (handicapStrokes === 0) {
         try {
-          // Calculate handicap strokes for this player on this hole
-          const handicapStrokes = await storage.getHoleHandicapStrokes(
-            score.playerId, 
-            match.roundId, 
-            score.holeNumber
+          // First check if this player already has a course handicap
+          const playerHandicap = await storage.getPlayerCourseHandicap(
+            score.playerId,
+            match.roundId
           );
           
-          // Include the calculated handicap strokes in the score object
-          score.handicapStrokes = handicapStrokes;
-          
-          // If the score is provided, calculate the net score
-          if (score.score !== null) {
-            score.netScore = Math.max(0, score.score - handicapStrokes);
+          if (playerHandicap && playerHandicap.courseHandicap > 0) {
+            // Get the hole details to check its handicap rank
+            const hole = await storage.getHole(match.roundId, score.holeNumber);
+            
+            if (hole && hole.handicapRank) {
+              // Calculate strokes based on course handicap and hole rank
+              handicapStrokes = await storage.getHoleHandicapStrokes(
+                score.playerId,
+                match.roundId,
+                score.holeNumber
+              );
+              
+              console.log(`Calculated ${handicapStrokes} handicap strokes for player ${score.playerId} on hole ${score.holeNumber}`);
+            }
           }
+          
+          // Update the score object with calculated handicap strokes
+          score.handicapStrokes = handicapStrokes;
         } catch (handicapError) {
           console.warn("Warning: Failed to calculate handicap strokes:", handicapError);
-          // Use default of 0 if calculation fails
           score.handicapStrokes = 0;
         }
+      }
+      
+      // Always calculate net score if a score is provided
+      if (score.score !== null) {
+        score.netScore = Math.max(0, score.score - handicapStrokes);
       }
       
       // Step 1: Save to best_ball_player_scores table with handicap info

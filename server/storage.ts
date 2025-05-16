@@ -243,6 +243,33 @@ export class DBStorage implements IStorage {
   async getHolesByCourse(courseId: number) {
     return db.select().from(holes).where(eq(holes.courseId, courseId));
   }
+  
+  // Get a specific hole by round ID and hole number
+  async getHole(roundId: number, holeNumber: number): Promise<any | undefined> {
+    try {
+      // First, get the round to find the course
+      const round = await this.getRound(roundId);
+      if (!round || !round.courseId) {
+        return undefined;
+      }
+      
+      // Find the hole with the matching number for this course
+      const [hole] = await db
+        .select()
+        .from(holes)
+        .where(
+          and(
+            eq(holes.courseId, round.courseId),
+            eq(holes.number, holeNumber)
+          )
+        );
+        
+      return hole;
+    } catch (error) {
+      console.error("Error in getHole:", error);
+      return undefined;
+    }
+  }
 
   // Users
   async getUsers() {
@@ -2200,29 +2227,30 @@ export class DBStorage implements IStorage {
   async getHoleHandicapStrokes(playerId: number, roundId: number, holeNumber: number): Promise<number> {
     // Get the player's course handicap
     const handicapData = await this.getPlayerCourseHandicap(playerId, roundId);
+    if (!handicapData) {
+      console.log(`No handicap data found for player ${playerId} on round ${roundId}`);
+      return 0;
+    }
+    
     const courseHandicap = handicapData.courseHandicap || 0;
     
     if (courseHandicap <= 0) {
       return 0; // No strokes given if handicap is 0 or negative
     }
     
-    // Get the round to find the course
-    const courseRound = await this.getRound(roundId);
-    if (!courseRound || !courseRound.courseId) {
-      return 0;
-    }
+    // Get the hole directly using the new method
+    const hole = await this.getHole(roundId, holeNumber);
     
-    // Get the hole details including its handicap rank
-    const courseHoles = await this.getHolesByCourse(courseRound.courseId);
-    const hole = courseHoles.find(h => h.number === holeNumber);
-    
-    if (!hole || hole.handicapRank === null) {
+    if (!hole || hole.handicapRank === null || hole.handicapRank === undefined) {
+      console.log(`No handicap rank found for hole ${holeNumber} in round ${roundId}`);
       return 0; // No strokes if hole has no handicap ranking
     }
     
     // Determine if player gets a stroke on this hole
     // If course handicap is 9, player gets strokes on holes ranked 1-9
-    return hole.handicapRank <= courseHandicap ? 1 : 0;
+    const strokes = hole.handicapRank <= courseHandicap ? 1 : 0;
+    console.log(`Player ${playerId} gets ${strokes} strokes on hole ${holeNumber} (rank: ${hole.handicapRank}, handicap: ${courseHandicap})`);
+    return strokes;
   }
 
   async storePlayerCourseHandicap(playerId: number, roundId: number, courseHandicap: number) {
