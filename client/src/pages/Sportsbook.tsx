@@ -156,6 +156,15 @@ export default function Sportsbook() {
 
   // Handle form submission for placing a bet
   const onSubmit = async (values: z.infer<typeof betFormSchema>) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to place bets.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       // Convert string IDs to numbers for API
       const payload = {
@@ -217,21 +226,6 @@ export default function Sportsbook() {
         return "bg-blue-500";
     }
   };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="container py-10">
-        <Card>
-          <CardHeader>
-            <CardTitle>Sportsbook</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Please log in to access the sportsbook.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   const isLoading =
     isLoadingBetTypes ||
