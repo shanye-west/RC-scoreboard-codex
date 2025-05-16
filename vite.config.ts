@@ -28,4 +28,13 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },
+  server: {
+    host: true,
+    port: 5173,
+    hmr: {
+      host: 'fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev', // <-- your Replit public URL (no https://)
+      protocol: 'wss',
+      clientPort: 443,
+    },
+  },
 });
