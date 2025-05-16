@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -28,14 +28,48 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 
+// Types
+interface BetType {
+  id: number;
+  name: string;
+  description: string;
+  options: string[];
+}
+
+interface Bet {
+  id: number;
+  description: string;
+  selectedOption: string;
+  status: 'pending' | 'won' | 'lost' | 'push' | 'cancelled';
+  odds: string;
+  amount: string;
+  potentialPayout: string;
+  actualResult?: string;
+}
+
+interface Match {
+  id: number;
+  name: string;
+}
+
+interface Round {
+  id: number;
+  name: string;
+}
+
+interface Player {
+  id: number;
+  name: string;
+}
+
 // Form schema for placing a bet
 const betFormSchema = z.object({
   betTypeId: z.string(),
   description: z.string().min(3, "Description must be at least 3 characters"),
-  amount: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+  amount: z.string().refine((val: string) => !isNaN(Number(val)) && Number(val) > 0, {
     message: "Amount must be a positive number",
   }),
-  odds: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+  odds: z.string().refine((val: string) => !isNaN(Number(val)) && Number(val) > 0, {
     message: "Odds must be a positive number",
   }),
   selectedOption: z.string().min(1, "You must select an option"),
@@ -45,8 +79,10 @@ const betFormSchema = z.object({
   line: z.string().optional(),
 });
 
+type BetFormValues = z.infer<typeof betFormSchema>;
+
 // Format currency values
-const formatCurrency = (value: string | number) => {
+const formatCurrency = (value: string | number): string => {
   const numValue = typeof value === "string" ? parseFloat(value) : value;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -54,17 +90,18 @@ const formatCurrency = (value: string | number) => {
   }).format(numValue);
 };
 
-export default function Sportsbook() {
+const Sportsbook: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("available-bets");
+  const [selectedBetType, setSelectedBetType] = useState<BetType | null>(null);
 
   // Query for bet types
   const {
     data: betTypes,
     isLoading: isLoadingBetTypes,
     error: betTypesError,
-  } = useQuery({
+  } = useQuery<BetType[]>({
     queryKey: ["/api/bet-types"],
     enabled: true,
   });
@@ -75,37 +112,37 @@ export default function Sportsbook() {
     isLoading: isLoadingUserBets,
     error: userBetsError,
     refetch: refetchUserBets,
-  } = useQuery({
+  } = useQuery<Bet[]>({
     queryKey: ["/api/bets/user"],
     enabled: isAuthenticated,
   });
 
-  // Query for matches (to populate bet options)
+  // Query for matches
   const {
     data: matches,
     isLoading: isLoadingMatches,
     error: matchesError,
-  } = useQuery({
+  } = useQuery<Match[]>({
     queryKey: ["/api/matches"],
     enabled: true,
   });
 
-  // Query for rounds (to populate bet options)
+  // Query for rounds
   const {
     data: rounds,
     isLoading: isLoadingRounds,
     error: roundsError,
-  } = useQuery({
+  } = useQuery<Round[]>({
     queryKey: ["/api/rounds"],
     enabled: true,
   });
 
-  // Query for players (to populate bet options)
+  // Query for players
   const {
     data: players,
     isLoading: isLoadingPlayers,
     error: playersError,
-  } = useQuery({
+  } = useQuery<Player[]>({
     queryKey: ["/api/players"],
     enabled: true,
   });
@@ -116,13 +153,13 @@ export default function Sportsbook() {
     isLoading: isLoadingBalance,
     error: balanceError,
     refetch: refetchBalance,
-  } = useQuery({
+  } = useQuery<{ balance: string }>({
     queryKey: ["/api/ledger/balance"],
     enabled: isAuthenticated,
   });
 
   // Form setup
-  const form = useForm<z.infer<typeof betFormSchema>>({
+  const form = useForm<BetFormValues>({
     resolver: zodResolver(betFormSchema),
     defaultValues: {
       betTypeId: "",
@@ -137,13 +174,10 @@ export default function Sportsbook() {
     },
   });
 
-  // Selected bet type
-  const [selectedBetType, setSelectedBetType] = useState<any>(null);
-  
   // Handle bet type change
   const handleBetTypeChange = (value: string) => {
-    const betType = betTypes?.find((bt: any) => bt.id.toString() === value);
-    setSelectedBetType(betType);
+    const betType = betTypes?.find((bt: BetType) => bt.id.toString() === value);
+    setSelectedBetType(betType || null);
     
     // Reset form values that depend on bet type
     form.setValue("description", betType ? `${betType.description}` : "");
@@ -155,7 +189,7 @@ export default function Sportsbook() {
   };
 
   // Handle form submission for placing a bet
-  const onSubmit = async (values: z.infer<typeof betFormSchema>) => {
+  const onSubmit = async (values: BetFormValues) => {
     if (!isAuthenticated) {
       toast({
         title: "Authentication Required",
@@ -212,7 +246,7 @@ export default function Sportsbook() {
   };
 
   // Get bet status badge color
-  const getBetStatusColor = (status: string) => {
+  const getBetStatusColor = (status: Bet['status']): string => {
     switch (status) {
       case "won":
         return "bg-green-500";
@@ -740,4 +774,6 @@ export default function Sportsbook() {
       </Tabs>
     </div>
   );
-}
+};
+
+export default Sportsbook;
