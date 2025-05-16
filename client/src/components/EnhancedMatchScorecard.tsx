@@ -925,7 +925,7 @@ const EnhancedMatchScorecard = ({
       }
     }
   }, [existingPlayerScores, individualScores, aviatorPlayersList, producerPlayersList, isBestBall, 
-      holes, playerScores, getPlayerCourseHandicap]);
+      holes, getPlayerCourseHandicap]);
 
   // Update handlePlayerScoreChange to use the mutation
   const handlePlayerScoreChange = async (
