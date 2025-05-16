@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import MatchHeader from "@/components/MatchHeader";
 import EnhancedMatchScorecard from "@/components/EnhancedMatchScorecard";
+import BestBallScorecard from "@/components/BestBallScorecard";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Edit, Save, Lock, Unlock } from "lucide-react";
@@ -570,17 +571,30 @@ const Match = ({ id }: { id: number }) => {
             result={match.result}
           />
 
-          {/* Enhanced Match Scorecard */}
-          <EnhancedMatchScorecard
-            matchId={id}
-            holes={holes || []}
-            scores={scores || []}
-            onScoreUpdate={handleScoreUpdate}
-            matchStatus={match.status}
-            matchType={round?.matchType || ""}
-            locked={isLocked}
-            participants={participants}
-          />
+          {/* Specialized Scorecard Components */}
+          {round?.matchType === "2-man Team Best Ball" ? (
+            <BestBallScorecard
+              matchId={id}
+              holes={holes || []}
+              scores={scores || []}
+              onTeamScoreUpdate={handleScoreUpdate}
+              matchStatus={match.status}
+              matchType={round?.matchType}
+              locked={isLocked}
+              participants={participants}
+            />
+          ) : (
+            <EnhancedMatchScorecard
+              matchId={id}
+              holes={holes || []}
+              scores={scores || []}
+              onScoreUpdate={handleScoreUpdate}
+              matchStatus={match.status}
+              matchType={round?.matchType || ""}
+              locked={isLocked}
+              participants={participants}
+            />
+          )}
         </>
       )}
 
