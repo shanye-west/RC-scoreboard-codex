@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BestBallPlayerScore {
   player: string;
@@ -728,6 +729,18 @@ export default function BestBallScorecard({
   const totalPar = frontNinePar + backNinePar;
 
   // Return the scorecard UI
+  // Check if data is still loading
+  const isLoading = !holes || holes.length === 0 || aviatorPlayersList.length === 0 || producerPlayersList.length === 0;
+  
+  if (isLoading) {
+    return (
+      <div className="best-ball-scorecard-container">
+        <Skeleton className="h-12 w-full mb-4" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+  
   return (
     <div className="best-ball-scorecard-container">
       <div className="scorecard-status">
@@ -807,7 +820,7 @@ export default function BestBallScorecard({
                         >
                           <input
                             type="number"
-                            value={scoreData?.score !== null ? scoreData.score.toString() : ''}
+                            value={scoreData && scoreData.score !== null && scoreData.score !== undefined ? scoreData.score.toString() : ''}
                             onChange={(e) =>
                               handlePlayerScoreChange(
                                 hole.number,
@@ -822,8 +835,11 @@ export default function BestBallScorecard({
                             disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                           />
                           {/* Net Score Display - only show when score is entered */}
-                          {scoreData?.score !== null && 
-                           scoreData?.handicapStrokes > 0 && (
+                          {scoreData && 
+                           scoreData.score !== null && 
+                           scoreData.score !== undefined && 
+                           scoreData.handicapStrokes && 
+                           scoreData.handicapStrokes > 0 && (
                             <span className="net-score">
                               {scoreData.netScore}
                               <span className="handicap-dot">•</span>
