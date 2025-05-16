@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import MatchHeader from "@/components/MatchHeader";
 import EnhancedMatchScorecard from "@/components/EnhancedMatchScorecard";
+import BestBallScorecard from "@/components/BestBallScorecard";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Edit, Save, Lock, Unlock } from "lucide-react";
@@ -571,16 +572,43 @@ const Match = ({ id }: { id: number }) => {
           />
 
           {/* Enhanced Match Scorecard */}
-          <EnhancedMatchScorecard
-            matchId={id}
-            holes={holes || []}
-            scores={scores || []}
-            onScoreUpdate={handleScoreUpdate}
-            matchStatus={match.status}
-            matchType={round?.matchType || ""}
-            locked={isLocked}
-            participants={participants}
-          />
+          {round?.matchType === "2-man Team Best Ball" ? (
+            <BestBallScorecard
+              matchId={id}
+              holes={holes || []}
+              aviatorPlayersList={participants?.filter((p: any) => p.team === "aviators").map((p: any) => {
+                const player = players.find((player: any) => player.id === p.playerId);
+                return player;
+              }).filter(Boolean) || []}
+              producerPlayersList={participants?.filter((p: any) => p.team === "producers").map((p: any) => {
+                const player = players.find((player: any) => player.id === p.playerId);
+                return player;
+              }).filter(Boolean) || []}
+              participants={participants || []}
+              allPlayers={players || []}
+              matchData={match}
+              roundHandicapData={match?.roundId ? 
+                players?.filter((p: any) => participants?.some((part: any) => part.playerId === p.id))
+                  .map((p: any) => ({
+                    playerId: p.id,
+                    roundId: match.roundId,
+                    courseHandicap: p.handicap || 0
+                  })) || []
+                : []}
+              isMobile={false}
+            />
+          ) : (
+            <EnhancedMatchScorecard
+              matchId={id}
+              holes={holes || []}
+              scores={scores || []}
+              onScoreUpdate={handleScoreUpdate}
+              matchStatus={match.status}
+              matchType={round?.matchType || ""}
+              locked={isLocked}
+              participants={participants}
+            />
+          )}
         </>
       )}
 
