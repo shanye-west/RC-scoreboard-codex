@@ -2311,42 +2311,69 @@ export class DBStorage implements IStorage {
 
   // Best Ball Score methods with enhanced persistence
   async saveBestBallScore(score: InsertBestBallScore) {
-    // Save to best_ball_player_scores table with handicap information
-    const existingScore = await db
-      .select()
-      .from(best_ball_player_scores)
-      .where(
-        and(
-          eq(best_ball_player_scores.matchId, score.matchId),
-          eq(best_ball_player_scores.playerId, score.playerId),
-          eq(best_ball_player_scores.holeNumber, score.holeNumber)
+    try {
+      // First, make sure handicap strokes is properly set
+      score.handicapStrokes = score.handicapStrokes || 0;
+      
+      // Log the received score data
+      console.log(`Saving best ball score for player ${score.playerId}, hole ${score.holeNumber}: score=${score.score}, handicap=${score.handicapStrokes}, net=${score.netScore}`);
+      
+      // If we have a score but no net score, calculate it
+      if (score.score !== null && (score.netScore === undefined || score.netScore === null)) {
+        score.netScore = Math.max(0, score.score - score.handicapStrokes);
+        console.log(`Calculated net score: ${score.netScore}`);
+      }
+      
+      // Check if this score already exists
+      const existingScore = await db
+        .select()
+        .from(best_ball_player_scores)
+        .where(
+          and(
+            eq(best_ball_player_scores.matchId, score.matchId),
+            eq(best_ball_player_scores.playerId, score.playerId),
+            eq(best_ball_player_scores.holeNumber, score.holeNumber)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (existingScore.length > 0) {
-      // Update existing score
-      return db
-        .update(best_ball_player_scores)
-        .set({
-          score: score.score,
-          handicapStrokes: score.handicapStrokes,
-          netScore: score.netScore,
-          updatedAt: new Date().toISOString()
-        })
-        .where(eq(best_ball_player_scores.id, existingScore[0].id))
-        .returning();
-    } else {
-      // Insert new score
-      return db
-        .insert(best_ball_player_scores)
-        .values({
-          ...score,
-          handicapStrokes: score.handicapStrokes || 0, // Ensure handicap strokes is never null
-          netScore: score.netScore !== undefined ? score.netScore : 
-                  (score.score !== null ? score.score - (score.handicapStrokes || 0) : null)
-        })
-        .returning();
+      if (existingScore.length > 0) {
+        // Update existing score
+        const [updated] = await db
+          .update(best_ball_player_scores)
+          .set({
+            score: score.score,
+            handicapStrokes: score.handicapStrokes,
+            netScore: score.netScore,
+            updatedAt: new Date().toISOString()
+          })
+          .where(eq(best_ball_player_scores.id, existingScore[0].id))
+          .returning();
+        
+        console.log(`Updated best ball score id=${updated.id} with handicap=${updated.handicapStrokes}`);
+        return updated;
+      } else {
+        // Insert new score
+        const [created] = await db
+          .insert(best_ball_player_scores)
+          .values({
+            matchId: score.matchId,
+            playerId: score.playerId,
+            holeNumber: score.holeNumber,
+            score: score.score,
+            handicapStrokes: score.handicapStrokes,
+            netScore: score.netScore,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          })
+          .returning();
+        
+        console.log(`Created new best ball score id=${created.id} with handicap=${created.handicapStrokes}`);
+        return created;
+      }
+    } catch (error) {
+      console.error("Error saving best ball score:", error);
+      throw error;
     }
   }
   

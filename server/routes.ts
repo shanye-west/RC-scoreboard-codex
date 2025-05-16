@@ -1047,8 +1047,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(matchId)) {
         return res.status(400).json({ error: 'Invalid match ID' });
       }
+      
+      // Get stored scores with handicap information
       const scores = await storage.getBestBallScores(matchId);
-      res.json(scores);
+      
+      // Get the match to find the round
+      const match = await storage.getMatch(matchId);
+      if (!match || !match.roundId) {
+        return res.status(404).json({ error: 'Match not found or no round associated' });
+      }
+      
+      // Process each score to ensure handicap data is present and correct
+      const processedScores = await Promise.all(scores.map(async (score) => {
+        // Only recalculate handicap if it's missing or 0
+        if (score.handicapStrokes === null || score.handicapStrokes === undefined || score.handicapStrokes === 0) {
+          // Calculate handicap strokes for this player on this hole
+          const strokes = await storage.getHoleHandicapStrokes(
+            score.playerId,
+            match.roundId,
+            score.holeNumber
+          );
+          
+          // Only update database if the value has changed
+          if (strokes !== score.handicapStrokes) {
+            score.handicapStrokes = strokes;
+            
+            // Recalculate net score if needed
+            if (score.score !== null) {
+              score.netScore = Math.max(0, score.score - score.handicapStrokes);
+            }
+            
+            // Update in database (but don't wait for response to avoid slowing down API)
+            storage.saveBestBallScore({
+              matchId: score.matchId,
+              playerId: score.playerId,
+              holeNumber: score.holeNumber,
+              score: score.score,
+              handicapStrokes: score.handicapStrokes,
+              netScore: score.netScore
+            }).catch(err => {
+              console.error(`Failed to update handicap strokes: ${err.message}`);
+            });
+          }
+        }
+        
+        return score;
+      }));
+      
+      // Return the processed scores 
+      res.json(processedScores);
     } catch (error) {
       console.error('Error fetching best ball scores:', error);
       res.status(500).json({ error: 'Failed to fetch scores' });
