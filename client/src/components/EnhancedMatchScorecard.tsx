@@ -116,7 +116,7 @@ const EnhancedMatchScorecard = ({
       const courseHandicap = getPlayerCourseHandicap(playerId);
       
       // Find player details for logging
-      const playerName = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === playerId)?.name || `Player ${playerId}`;
+      const playerName = allPlayers.find(p => p.id === playerId)?.name || `Player ${playerId}`;
       
       // Find the hole with the matching number
       const hole = holes.find(h => h.number === holeNumber);
@@ -241,7 +241,7 @@ const EnhancedMatchScorecard = ({
       queryClient.invalidateQueries({ queryKey: [`/api/round-handicaps/${matchData?.roundId}`] });
       
       // Find player
-      const player = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === variables.playerId);
+      const player = allPlayers.find(p => p.id === variables.playerId);
       if (!player) return;
       
       // Recalculate handicap strokes for this player on all holes
@@ -395,7 +395,7 @@ const EnhancedMatchScorecard = ({
       const { playerId, holeNumber, score, handicapStrokes = 0 } = savedScore;
       
       // Find the player from our lists
-      const player = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === playerId);
+      const player = allPlayers.find(p => p.id === playerId);
       if (!player) return;
       
       // Determine team ID - convert plural form to singular
