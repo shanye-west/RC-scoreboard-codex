@@ -66,6 +66,10 @@ export interface IStorage {
   updatePlayer(id: number, data: Partial<any>): Promise<any | undefined>;
   deletePlayer(id: number): Promise<boolean>;
   deleteAllPlayers(): Promise<boolean>;
+  
+  // Best Ball Score methods
+  getBestBallScores(matchId: number): Promise<any[]>;
+  saveBestBallScore(data: InsertBestBallScore): Promise<BestBallScore>;
 
   // Team methods
   getTeams(): Promise<any[]>;
