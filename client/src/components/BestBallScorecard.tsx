@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabaseClient';
 import { toast } from 'react-hot-toast';
 import { Button } from './ui/button';
 import { BestBallPlayerScore, BestBallHole, BestBallPlayer } from '../types/bestBall';
+import axios from 'axios';
 
 interface BestBallScorecardProps {
   matchId: number;
@@ -27,12 +27,20 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
   // Fetch player handicaps
   const { data: playerHandicaps = [] } = useQuery({
     queryKey: [`/api/round-handicaps/${roundId}`],
+    queryFn: async () => {
+      const response = await axios.get(`/api/round-handicaps/${roundId}`);
+      return response.data;
+    },
     enabled: !!roundId
   });
 
   // Fetch existing scores
   const { data: existingScores = [] } = useQuery({
     queryKey: [`/api/best-ball-scores/${matchId}`],
+    queryFn: async () => {
+      const response = await axios.get(`/api/best-ball-scores/${matchId}`);
+      return response.data;
+    },
     enabled: !!matchId
   });
 
@@ -46,19 +54,8 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
       handicapStrokes: number;
       netScore: number | null;
     }) => {
-      const { data, error } = await supabase
-        .from('best_ball_player_scores')
-        .upsert({
-          match_id: score.matchId,
-          player_id: score.playerId,
-          hole_number: score.holeNumber,
-          score: score.score,
-          handicap_strokes: score.handicapStrokes,
-          net_score: score.netScore
-        });
-
-      if (error) throw error;
-      return data;
+      const response = await axios.post('/api/best-ball-scores', score);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });

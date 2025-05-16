@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabaseClient';
+import axios from 'axios';
 import BestBallScorecard from './BestBallScorecard';
 import { BestBallMatch, BestBallHole, BestBallPlayer } from '../types/bestBall';
 
@@ -14,14 +14,8 @@ const BestBallMatch: React.FC<BestBallMatchProps> = ({ matchId, isAdmin }) => {
   const { data: match } = useQuery<BestBallMatch>({
     queryKey: ['match', matchId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('best_ball_matches')
-        .select('*')
-        .eq('id', matchId)
-        .single();
-
-      if (error) throw error;
-      return data;
+      const response = await axios.get(`/api/matches/${matchId}`);
+      return response.data;
     }
   });
 
@@ -29,13 +23,8 @@ const BestBallMatch: React.FC<BestBallMatchProps> = ({ matchId, isAdmin }) => {
   const { data: holes = [] } = useQuery<BestBallHole[]>({
     queryKey: ['holes'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('holes')
-        .select('*')
-        .order('number');
-
-      if (error) throw error;
-      return data;
+      const response = await axios.get('/api/holes');
+      return response.data;
     }
   });
 
@@ -43,12 +32,8 @@ const BestBallMatch: React.FC<BestBallMatchProps> = ({ matchId, isAdmin }) => {
   const { data: players = [] } = useQuery<BestBallPlayer[]>({
     queryKey: ['players'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('players')
-        .select('*');
-
-      if (error) throw error;
-      return data;
+      const response = await axios.get('/api/players');
+      return response.data;
     }
   });
 

@@ -1,6 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import { User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import axios from 'axios';
+
+interface User {
+  id: number;
+  username: string;
+  isAdmin: boolean;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -11,7 +16,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isAdmin: false,
-  loading: true,
+  loading: true
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -22,46 +27,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for changes on auth state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Check if user is admin
-  useEffect(() => {
-    if (!user) {
-      setIsAdmin(false);
-      return;
-    }
-
-    const checkAdminStatus = async () => {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error checking admin status:', error);
+    const checkAuth = async () => {
+      try {
+        const response = await axios.get('/api/auth/me');
+        const userData = response.data;
+        setUser(userData);
+        setIsAdmin(userData.isAdmin);
+      } catch (error) {
+        setUser(null);
         setIsAdmin(false);
-        return;
+      } finally {
+        setLoading(false);
       }
-
-      setIsAdmin(data?.role === 'admin');
     };
 
-    checkAdminStatus();
-  }, [user]);
+    checkAuth();
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, isAdmin, loading }}>
