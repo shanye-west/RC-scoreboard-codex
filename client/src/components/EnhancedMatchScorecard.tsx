@@ -997,7 +997,13 @@ const EnhancedMatchScorecard = ({
       if (key.startsWith(`${holeNumber}-`) && !key.includes("-aviator") && !key.includes("-producer")) {
         // This is a player's key for this hole
         if (scores && scores.length > 0) {
-          playerScoresForHole.push(scores[0]);
+          // Make sure the score has all required fields
+          const scoreWithDefaults = {
+            ...scores[0],
+            handicapStrokes: scores[0].handicapStrokes || 0,
+            netScore: scores[0].netScore || (scores[0].score !== null ? scores[0].score - (scores[0].handicapStrokes || 0) : null)
+          };
+          playerScoresForHole.push(scoreWithDefaults);
         }
       }
     });
@@ -1008,13 +1014,21 @@ const EnhancedMatchScorecard = ({
     }
   };
 
+  // Reference for fallback scores loading
+  const fallbackScoresLoaded = useRef(false);
+  
   // Fix for: Type 'Set<any>' can only be iterated through
   // Fallback mechanism to load scores from player_scores if best_ball_scores aren't available
   useEffect(() => {
-    // Only run if best ball match, we have existing player scores, and we don't have individual scores
+    // Only run if best ball match, we have existing player scores, we don't have individual scores, and we haven't loaded yet
     if (isBestBall && 
         Array.isArray(existingPlayerScores) && existingPlayerScores.length > 0 && 
-        (!Array.isArray(individualScores) || individualScores.length === 0)) {
+        (!Array.isArray(individualScores) || individualScores.length === 0) &&
+        !fallbackScoresLoaded.current) {
+      
+      // Mark as loaded to prevent infinite loops
+      fallbackScoresLoaded.current = true;
+      
       console.log("Fallback: Loading scores from player_scores table:", existingPlayerScores.length, "scores found");
       const newPlayerScores = new Map();
       
