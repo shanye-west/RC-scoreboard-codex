@@ -72,6 +72,14 @@ const Layout = ({ children }: LayoutProps) => {
               >
                 History
               </button>
+
+              {/* Sportsbook Button */}
+              <button 
+                className="px-3 py-1 rounded-md hover:bg-gray-100 font-medium text-gray-800"
+                onClick={() => handleNavigation('/sportsbook')}
+              >
+                Sportsbook
+              </button>
             
             {/* Login/Logout Button */}
             {isAuthenticated ? (
