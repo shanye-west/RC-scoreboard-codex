@@ -57,7 +57,7 @@ const formatCurrency = (value: string | number) => {
 export default function Sportsbook() {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("my-bets");
+  const [activeTab, setActiveTab] = useState("available-bets");
 
   // Query for bet types
   const {
@@ -300,6 +300,13 @@ export default function Sportsbook() {
                             ))}
                           </ul>
                         </div>
+                        {!isAuthenticated && (
+                          <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                            <p className="text-sm text-gray-600">
+                              Please log in to place bets
+                            </p>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
