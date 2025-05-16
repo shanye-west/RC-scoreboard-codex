@@ -846,18 +846,45 @@ const EnhancedMatchScorecard = ({
     // Get all player scores for this hole
     const playerScoresForHole: BestBallPlayerScore[] = [];
     
-    // Extract team scores from the map
+    // Extract team scores from the map - first collect all player scores for this hole
     for (const [key, scores] of currentScores.entries()) {
       if (key.startsWith(`${holeNumber}-`) && !key.includes("-aviator") && !key.includes("-producer")) {
         // This is a player's key for this hole
         if (scores && scores.length > 0) {
-          playerScoresForHole.push(scores[0]);
+          // Make sure handicap strokes are included
+          const playerScore = scores[0];
+          
+          // If handicap strokes aren't set, try to calculate them
+          if (playerScore.handicapStrokes === undefined || playerScore.handicapStrokes === null) {
+            const playerId = playerScore.playerId;
+            const courseHandicap = getPlayerCourseHandicap(playerId);
+            const hole = holes.find(h => h.number === holeNumber);
+            const handicapRank = hole?.handicapRank || 0;
+            
+            if (handicapRank > 0 && courseHandicap >= handicapRank) {
+              playerScore.handicapStrokes = 1;
+              if (handicapRank === 1 && courseHandicap >= 19) {
+                playerScore.handicapStrokes = 2;
+              }
+            } else {
+              playerScore.handicapStrokes = 0;
+            }
+            
+            // Recalculate net score with the handicap
+            if (playerScore.score !== null) {
+              playerScore.netScore = playerScore.score - playerScore.handicapStrokes;
+            }
+          }
+          
+          console.log(`Including player score in update: Player ${playerScore.playerId}, Handicap: ${playerScore.handicapStrokes}`);
+          playerScoresForHole.push(playerScore);
         }
       }
     }
     
     // Update the match scores
     if (playerScoresForHole.length > 0) {
+      console.log(`Updating scores for hole ${holeNumber} with ${playerScoresForHole.length} player scores`);
       onBestBallScoreUpdate(holeNumber, playerScoresForHole);
     }
   };
@@ -968,6 +995,9 @@ const EnhancedMatchScorecard = ({
 
     // Save to database with error handling
     try {
+      // Log what we're saving to the database to help with debugging
+      console.log(`Saving to best_ball_scores: Player ${playerId}, Hole ${holeNumber}, Score ${numValue}, Handicap ${handicapStrokes}, Net ${netScore}`);
+      
       await saveScoreMutation.mutateAsync({
         matchId,
         playerId,
