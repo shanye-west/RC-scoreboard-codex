@@ -379,7 +379,7 @@ const EnhancedMatchScorecard = ({
     console.log("Loading saved player scores from database:", existingPlayerScores);
     
     // Create a new Map to hold all loaded scores
-    const loadedScores = new Map(playerScores);
+    const loadedScores = new Map();
     
     // Process each saved player score
     existingPlayerScores.forEach((savedScore: any) => {
@@ -436,7 +436,7 @@ const EnhancedMatchScorecard = ({
       updateBestBallScores(hole.number, loadedScores);
     });
     
-  }, [existingPlayerScores, holes, playerScores, matchId, aviatorPlayersList, producerPlayersList]);
+  }, [existingPlayerScores, holes, matchId, aviatorPlayersList, producerPlayersList]);
   
   // Load handicap strokes for all players on all holes
   useEffect(() => {

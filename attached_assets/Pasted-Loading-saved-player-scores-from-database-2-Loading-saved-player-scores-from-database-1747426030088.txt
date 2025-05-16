@@ -1,0 +1,109 @@
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Warning: Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn&#x27;t have a dependency array, or one of the dependencies changes on every render.
+    at EnhancedMatchScorecard (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/components/EnhancedMatchScorecard.tsx:24:3)
+    at div
+    at Match (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/pages/Match.tsx:48:18)
+    at Route (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=67d877b3:280:16)
+    at Switch (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=67d877b3:336:17)
+    at Router (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/App.tsx?v=7PuoEtTRY-QvXjaB-XH7m:41:31)
+    at main
+    at div
+    at Layout (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/components/Layout.tsx:24:19)
+    at Provider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-BKOR25MY.js?v=67d877b3:38:15)
+    at TooltipProvider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=67d877b3:60:5)
+    at AuthProvider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/src/hooks/use-auth.tsx:26:32)
+    at QueryClientProvider (https://fc81c2f7-3420-40d7-834e-567ca14254c0-00-2n7cz659ktyaa.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=67d877b3:2875:3)
+    at App
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
+Loading saved player scores from database: 
+(2) [{…}, {…}]
