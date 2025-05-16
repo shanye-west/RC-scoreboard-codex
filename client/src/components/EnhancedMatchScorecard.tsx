@@ -10,6 +10,13 @@ import {
   markScoreAsSynced,
   getMatchScoresFromLocalStorage
 } from "@/lib/offlineStorage";
+import {
+  savePlayerCourseHandicap,
+  getPlayerCourseHandicapFromStorage,
+  saveHandicapStrokes,
+  getHandicapStrokesFromStorage,
+  calculateHandicapStrokes
+} from "@/lib/handicapUtils";
 
 // DEFINE INTERFACES
 interface Hole {
@@ -107,9 +114,15 @@ const EnhancedMatchScorecard = ({
   
   // Function to calculate handicap strokes for a player on a specific hole
   const getHandicapStrokes = async (playerId: number, holeNumber: number) => {
-    if (!matchData?.roundId || !isBestBall) return 0;
+    if (!isBestBall) return 0;
     
     try {
+      // Check for cached handicap strokes in localStorage first
+      const cachedStrokes = getHandicapStrokesFromStorage(playerId, holeNumber, matchId);
+      if (cachedStrokes > 0) {
+        return cachedStrokes;
+      }
+      
       // Get player's course handicap
       const courseHandicap = getPlayerCourseHandicap(playerId);
       
@@ -123,23 +136,31 @@ const EnhancedMatchScorecard = ({
       console.log(`Calculating handicap strokes for ${playerName} (id: ${playerId}) on hole ${holeNumber}`);
       console.log(`- Course Handicap: ${courseHandicap}, Hole Handicap Rank: ${handicapRank}`);
       
+      let strokes = 0;
+      
       // Calculate strokes based on hole handicap rank
       // If player's handicap is higher than or equal to the hole's handicap rank, they get a stroke
       // For example, if player has handicap 8 and hole rank is 5, they get a stroke
       if (handicapRank > 0 && courseHandicap >= handicapRank) {
         console.log(`- ${playerName} gets 1 stroke on hole ${holeNumber}`);
-        return 1;
+        strokes = 1;
       }
       
       // Calculate additional strokes for very high handicaps
       // If player has handicap 19+ on hole rank 1, they get 2 strokes
       if (handicapRank === 1 && courseHandicap >= 19) {
         console.log(`- ${playerName} gets 2 strokes on hole ${holeNumber}`);
-        return 2;
+        strokes = 2;
       }
       
-      console.log(`- ${playerName} gets 0 strokes on hole ${holeNumber}`);
-      return 0;
+      if (strokes === 0) {
+        console.log(`- ${playerName} gets 0 strokes on hole ${holeNumber}`);
+      }
+      
+      // Save to localStorage for persistence
+      saveHandicapStrokes(playerId, holeNumber, matchId, strokes);
+      
+      return strokes;
     } catch (error) {
       console.error("Error calculating handicap strokes:", error);
       return 0;
@@ -310,12 +331,25 @@ const EnhancedMatchScorecard = ({
     }
   });
   
-  // Function to get a player's course handicap
+  // For debounced invalidation
+  let invalidationTimer: ReturnType<typeof setTimeout>;
+
+  // Function to get a player's course handicap with localStorage fallback
   const getPlayerCourseHandicap = (playerId: number): number => {
-    if (!playerHandicaps || !playerHandicaps.length) return 0;
+    if (!playerHandicaps || !playerHandicaps.length) {
+      // Try to get from localStorage if not available from API
+      return getPlayerCourseHandicapFromStorage(playerId, matchData?.roundId || 0);
+    }
     
     const handicapEntry = playerHandicaps.find(h => h.playerId === playerId);
-    return handicapEntry?.courseHandicap || 0;
+    const handicap = handicapEntry?.courseHandicap || 0;
+    
+    // Save to localStorage for persistence
+    if (matchData?.roundId) {
+      savePlayerCourseHandicap(playerId, matchData.roundId, handicap);
+    }
+    
+    return handicap;
   };
   
   // Function to handle handicap edit
@@ -897,8 +931,47 @@ const EnhancedMatchScorecard = ({
       handicapStrokes: number;
       netScore: number | null;
     }) => {
-      // Always save to local storage first for offline resilience
+      // Always save to local storage first for guaranteed persistence
       saveScoreToLocalStorage(score);
+      
+      // Also update the state immediately to ensure UI consistency
+      const player = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === score.playerId);
+      
+      if (player) {
+        const teamKey = `${score.holeNumber}-${player.teamId === 1 ? 'aviator' : 'producer'}`;
+        const playerKey = `${score.holeNumber}-${player.name}`;
+        
+        const scoreObj = {
+          player: player.name,
+          score: score.score,
+          teamId: player.teamId === 1 ? 'aviator' : 'producer',
+          playerId: player.id,
+          handicapStrokes: score.handicapStrokes,
+          netScore: score.netScore
+        };
+        
+        // Update state immediately without waiting for server
+        setPlayerScores(prev => {
+          const newScores = new Map(prev);
+          
+          // Update team scores
+          const teamScores = newScores.get(teamKey) || [];
+          const playerIndex = teamScores.findIndex(s => s.playerId === player.id);
+          
+          if (playerIndex >= 0) {
+            teamScores[playerIndex] = scoreObj;
+          } else {
+            teamScores.push(scoreObj);
+          }
+          
+          newScores.set(teamKey, teamScores);
+          
+          // Update player score
+          newScores.set(playerKey, [scoreObj]);
+          
+          return newScores;
+        });
+      }
       
       try {
         // Attempt to save to server
@@ -906,7 +979,7 @@ const EnhancedMatchScorecard = ({
         return response.json();
       } catch (error) {
         console.error("Failed to save score to server:", error);
-        // Even though server save failed, we've saved to local storage
+        // Even though server save failed, we've saved to local storage and updated state
         // Return a success response to avoid UI disruption
         return {
           message: "Score saved offline. Will sync when connection is restored.",
@@ -916,13 +989,18 @@ const EnhancedMatchScorecard = ({
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
+      // Don't invalidate queries immediately to avoid flickering
+      // Instead, use a debounced invalidation
+      clearTimeout(invalidationTimer);
+      invalidationTimer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
+      }, 2000);
     },
     onError: (error) => {
       console.error('Error saving score:', error);
-      // Notify user of error
-      alert('Failed to save score. Please try again.');
+      // Notify user of error but don't disrupt experience
+      console.warn('Failed to save score to server. Score is saved offline and will sync when connection is restored.');
     },
   });
 
