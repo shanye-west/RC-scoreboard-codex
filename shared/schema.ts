@@ -527,18 +527,41 @@ export type InsertPlayerScore = z.infer<typeof insertPlayerScoreSchema>;
 export type PlayerScore = typeof player_scores.$inferSelect;
 
 // Bets table - for future sportsbook integration
+// Bet Types Table - defines the different types of bets available
+export const bet_types = pgTable("bet_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(), // 'match_winner', 'player_prop', 'round_winner', 'over_under', etc.
+  description: text("description").notNull(),
+  isActive: boolean("is_active").default(true),
+});
+export const insertBetTypeSchema = createInsertSchema(bet_types);
+export type InsertBetType = z.infer<typeof insertBetTypeSchema>;
+export type BetType = typeof bet_types.$inferSelect;
+
+// Enhanced Bets table - supports all bet types
 export const bets = pgTable(
   "bets",
   {
     id: serial("id").primaryKey(),
     userId: integer("user_id").notNull(),
-    matchId: integer("match_id").notNull(),
-    betType: text("bet_type").notNull(),
-    wagerAmount: numeric("wager_amount").notNull(),
-    outcome: text("outcome"),
-    payout: numeric("payout"),
-    created: timestamp("created", { mode: 'string' }).defaultNow(),
-    resolved: timestamp("resolved", { mode: 'string' }),
+    betTypeId: integer("bet_type_id").notNull(),
+    description: text("description").notNull(), // Human-readable description of the bet
+    amount: numeric("amount").notNull(), // Wager amount
+    odds: numeric("odds").default("1.0"), // Multiplier for payout calculation
+    potentialPayout: numeric("potential_payout"), // Potential payout if bet wins
+    isParlay: boolean("is_parlay").default(false), // Whether this is a parlay bet
+    parlayId: integer("parlay_id"), // Reference to parent parlay bet if this is part of a parlay
+    status: text("status").notNull().$type<'pending' | 'won' | 'lost' | 'push' | 'cancelled'>().default('pending'),
+    settledAt: timestamp("settled_at", { mode: 'string' }),
+    createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+    tournamentId: integer("tournament_id"),
+    roundId: integer("round_id"), // For round-based bets
+    matchId: integer("match_id"), // For match-based bets
+    playerId: integer("player_id"), // For player prop bets
+    // Store bet parameters in standardized fields
+    selectedOption: text("selected_option").notNull(), // 'aviators', 'producers', 'tie', 'over', 'under', etc.
+    line: numeric("line"), // For over/under bets (e.g., 2.5 matches)
+    actualResult: text("actual_result"), // Actual outcome when bet is settled
   },
   (table) => {
     return {
@@ -547,17 +570,158 @@ export const bets = pgTable(
         foreignColumns: [users.id],
         name: "bets_user_id_fk",
       }),
+      betTypeIdFk: foreignKey({
+        columns: [table.betTypeId],
+        foreignColumns: [bet_types.id],
+        name: "bets_bet_type_id_fk",
+      }),
       matchIdFk: foreignKey({
         columns: [table.matchId],
         foreignColumns: [matches.id],
         name: "bets_match_id_fk",
       }),
+      roundIdFk: foreignKey({
+        columns: [table.roundId],
+        foreignColumns: [rounds.id],
+        name: "bets_round_id_fk",
+      }),
+      playerIdFk: foreignKey({
+        columns: [table.playerId],
+        foreignColumns: [players.id],
+        name: "bets_player_id_fk",
+      }),
+      tournamentIdFk: foreignKey({
+        columns: [table.tournamentId],
+        foreignColumns: [tournament.id],
+        name: "bets_tournament_id_fk",
+      }),
     };
   },
 );
-export const insertBetSchema = createInsertSchema(bets);
+export const insertBetSchema = createInsertSchema(bets).omit({
+  parlayId: true,
+  status: true,
+  settledAt: true,
+  createdAt: true,
+  actualResult: true,
+});
 export type InsertBet = z.infer<typeof insertBetSchema>;
 export type Bet = typeof bets.$inferSelect;
+
+// Parlay Bets table - for tracking parlays
+export const parlays = pgTable(
+  "parlays",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    description: text("description").notNull(),
+    totalAmount: numeric("total_amount").notNull(),
+    totalOdds: numeric("total_odds").notNull(), // Aggregate odds for the entire parlay
+    potentialPayout: numeric("potential_payout").notNull(),
+    status: text("status").notNull().$type<'pending' | 'won' | 'lost' | 'partial' | 'cancelled'>().default('pending'),
+    settledAt: timestamp("settled_at", { mode: 'string' }),
+    createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+    tournamentId: integer("tournament_id"),
+  },
+  (table) => {
+    return {
+      userIdFk: foreignKey({
+        columns: [table.userId],
+        foreignColumns: [users.id],
+        name: "parlays_user_id_fk",
+      }),
+      tournamentIdFk: foreignKey({
+        columns: [table.tournamentId],
+        foreignColumns: [tournament.id],
+        name: "parlays_tournament_id_fk",
+      }),
+    };
+  },
+);
+export const insertParlaySchema = createInsertSchema(parlays).omit({
+  status: true,
+  settledAt: true,
+  createdAt: true,
+});
+export type InsertParlay = z.infer<typeof insertParlaySchema>;
+export type Parlay = typeof parlays.$inferSelect;
+
+// Bet Settlement History - for audit/tracking of bet outcomes
+export const bet_settlements = pgTable(
+  "bet_settlements",
+  {
+    id: serial("id").primaryKey(),
+    betId: integer("bet_id").notNull(),
+    previousStatus: text("previous_status").notNull(),
+    newStatus: text("new_status").notNull(),
+    settledBy: integer("settled_by").notNull(), // User ID of admin who settled the bet
+    reason: text("reason"),
+    settledAt: timestamp("settled_at", { mode: 'string' }).defaultNow(),
+    payout: numeric("payout"),
+  },
+  (table) => {
+    return {
+      betIdFk: foreignKey({
+        columns: [table.betId],
+        foreignColumns: [bets.id],
+        name: "bet_settlements_bet_id_fk",
+      }),
+      settledByFk: foreignKey({
+        columns: [table.settledBy],
+        foreignColumns: [users.id],
+        name: "bet_settlements_settled_by_fk",
+      }),
+    };
+  },
+);
+export const insertBetSettlementSchema = createInsertSchema(bet_settlements).omit({
+  settledAt: true,
+});
+export type InsertBetSettlement = z.infer<typeof insertBetSettlementSchema>;
+export type BetSettlement = typeof bet_settlements.$inferSelect;
+
+// Ledger table - tracks money owed between users
+export const betting_ledger = pgTable(
+  "betting_ledger",
+  {
+    id: serial("id").primaryKey(),
+    creditorId: integer("creditor_id").notNull(), // User who is owed money
+    debtorId: integer("debtor_id").notNull(), // User who owes money
+    amount: numeric("amount").notNull(), // Amount owed
+    betId: integer("bet_id").notNull(), // Related bet
+    status: text("status").$type<'pending' | 'paid' | 'disputed'>().default('pending'),
+    createdAt: timestamp("created_at", { mode: 'string' }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow(),
+    settledAt: timestamp("settled_at", { mode: 'string' }),
+  },
+  (table) => {
+    return {
+      creditorIdFk: foreignKey({
+        columns: [table.creditorId],
+        foreignColumns: [users.id],
+        name: "betting_ledger_creditor_id_fk",
+      }),
+      debtorIdFk: foreignKey({
+        columns: [table.debtorId],
+        foreignColumns: [users.id],
+        name: "betting_ledger_debtor_id_fk",
+      }),
+      betIdFk: foreignKey({
+        columns: [table.betId],
+        foreignColumns: [bets.id],
+        name: "betting_ledger_bet_id_fk",
+      }),
+    };
+  },
+);
+export const insertLedgerEntrySchema = createInsertSchema(betting_ledger).omit({
+  status: true,
+  createdAt: true, 
+  updatedAt: true,
+  settledAt: true,
+});
+export type InsertLedgerEntry = z.infer<typeof insertLedgerEntrySchema>;
+export type LedgerEntry = typeof betting_ledger.$inferSelect;
 
 // Best Ball Player Scores table
 export const best_ball_player_scores = pgTable(

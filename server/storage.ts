@@ -20,11 +20,25 @@ import {
   player_matchups,
   player_match_type_stats,
   bets,
+  bet_types,
+  parlays,
+  bet_settlements,
+  betting_ledger,
   player_scores,
   best_ball_player_scores,
   InsertPlayerMatchup,
   InsertBestBallScore,
-  BestBallScore
+  BestBallScore,
+  Bet,
+  InsertBet,
+  BetType,
+  InsertBetType,
+  Parlay,
+  InsertParlay,
+  BetSettlement,
+  InsertBetSettlement,
+  LedgerEntry,
+  InsertLedgerEntry
 } from "@shared/schema";
 
 export interface IStorage {
@@ -163,12 +177,46 @@ export interface IStorage {
   storePlayerCourseHandicap(playerId: number, roundId: number, courseHandicap: number): Promise<any>;
   getAllPlayerCourseHandicaps(roundId: number): Promise<any[]>;
   
-  initializeData(): Promise<void>;
-
+  // Sportsbook methods - Bet Types
+  getBetTypes(): Promise<BetType[]>;
+  getBetType(id: number): Promise<BetType | undefined>;
+  getBetTypeByName(name: string): Promise<BetType | undefined>; 
+  createBetType(data: InsertBetType): Promise<BetType>;
+  updateBetType(id: number, data: Partial<BetType>): Promise<BetType | undefined>;
+  
+  // Sportsbook methods - Bets
+  getBets(): Promise<Bet[]>;
+  getUserBets(userId: number): Promise<Bet[]>;
+  getBet(id: number): Promise<Bet | undefined>;
+  getBetsByMatch(matchId: number): Promise<Bet[]>;
+  getBetsByRound(roundId: number): Promise<Bet[]>;
+  getBetsByPlayer(playerId: number): Promise<Bet[]>;
+  getBetsByStatus(status: string): Promise<Bet[]>;
+  createBet(data: InsertBet): Promise<Bet>;
+  updateBet(id: number, data: Partial<Bet>): Promise<Bet | undefined>;
+  settleBet(id: number, status: string, actualResult: string, settledBy: number): Promise<Bet>;
+  
+  // Sportsbook methods - Parlays
+  getParlays(): Promise<Parlay[]>;
+  getUserParlays(userId: number): Promise<Parlay[]>;
+  getParlay(id: number): Promise<Parlay | undefined>;
+  createParlay(data: InsertParlay, betIds: number[]): Promise<Parlay>;
+  updateParlay(id: number, data: Partial<Parlay>): Promise<Parlay | undefined>;
+  
+  // Sportsbook methods - Ledger
+  getLedgerEntries(): Promise<LedgerEntry[]>;
+  getUserLedgerEntries(userId: number): Promise<LedgerEntry[]>;
+  getLedgerEntriesBetweenUsers(user1Id: number, user2Id: number): Promise<LedgerEntry[]>;
+  createLedgerEntry(data: InsertLedgerEntry): Promise<LedgerEntry>;
+  updateLedgerEntry(id: number, data: Partial<LedgerEntry>): Promise<LedgerEntry | undefined>;
+  getUserBalance(userId: number): Promise<{ owed: number, owing: number, net: number }>;
+  
   // Best Ball Score methods
   saveBestBallScore(score: InsertBestBallScore): Promise<any>;
   getBestBallScores(matchId: number): Promise<any[]>;
   deleteBestBallScore(matchId: number, playerId: number, holeNumber: number): Promise<any>;
+  
+  initializeData(): Promise<void>;
 }
 
 export class DBStorage implements IStorage {
