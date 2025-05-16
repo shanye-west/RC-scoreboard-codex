@@ -33,441 +33,427 @@ interface BestBallScorecardProps {
 }
 
 /**
- * Best Ball Scorecard Component
+ * BestBallScorecard Component
  * 
- * This component displays a specialized scorecard for 2-man Team Best Ball matches
- * with full scoring functionality and handicap support
+ * Specialized scorecard for 2-man Team Best Ball format
+ * - Shows individual player scores alongside team scores
+ * - Calculates net scores based on handicaps
+ * - Highlights the better score (used for team total)
  */
-export default function BestBallScorecard({
+const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
   matchId,
-  holes = [],
-  aviatorPlayersList = [],
-  producerPlayersList = [],
-  participants = [],
-  allPlayers = [],
-  matchData = {},
-  roundHandicapData = [],
+  holes,
+  aviatorPlayersList,
+  producerPlayersList,
+  participants,
+  allPlayers,
+  matchData,
+  roundHandicapData,
   onScoreUpdate,
-  isMobile = false,
-}: BestBallScorecardProps) {
-  // State for scores, loading, and locking
+  isMobile = false
+}) => {
+  const { user, isAdmin } = useAuth();
   const [playerScores, setPlayerScores] = useState<Map<string, BestBallPlayerScore[]>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [locked, setLocked] = useState(false);
+  const [locked, setLocked] = useState(matchData?.status === "completed");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Split holes into front nine and back nine for display
-  const frontNine = useMemo(() => 
-    holes.filter(h => h.number >= 1 && h.number <= 9).sort((a, b) => a.number - b.number), 
-    [holes]
-  );
-  
-  const backNine = useMemo(() => 
-    holes.filter(h => h.number >= 10 && h.number <= 18).sort((a, b) => a.number - b.number), 
-    [holes]
-  );
-
-  // Calculate par totals
-  const frontNinePar = useMemo(() => 
-    frontNine.reduce((sum, hole) => sum + hole.par, 0), 
-    [frontNine]
-  );
-  
-  const backNinePar = useMemo(() => 
-    backNine.reduce((sum, hole) => sum + hole.par, 0), 
-    [backNine]
-  );
-  
-  const totalPar = useMemo(() => 
-    frontNinePar + backNinePar, 
-    [frontNinePar, backNinePar]
-  );
-  
-  // Fetch regular player scores from API
-  const { data: playerScoresData = [] } = useQuery<any[]>({
-    queryKey: [`/api/player-scores?matchId=${matchId}`],
-    enabled: !!matchId,
-  });
-  
-  // Get authentication status
-  const { isAdmin, user } = useAuth();
-  
-  // Check if current user is a participant
-  const isParticipant = useMemo(() => {
+  // Determine if the current user can edit scores (admin or participant)
+  const canEditScores = useMemo(() => {
+    if (isAdmin) return true;
     if (!user) return false;
     
-    const participantPlayerIds = participants.map((p: any) => p.playerId) || [];
-    const userPlayers = allPlayers.filter((player: any) => player.userId === user.id);
-    const userPlayerIds = userPlayers.map((player: any) => player.id);
+    // Find all player IDs linked to this user
+    const userPlayerIds = allPlayers
+      .filter((p: any) => p.userId === user.id)
+      .map((p: any) => p.id);
     
-    return userPlayerIds.some(id => participantPlayerIds.includes(id));
-  }, [user, participants, allPlayers]);
-  
-  // Determine if user can edit scores
-  const canEditScores = isAdmin || isParticipant;
-  
-  // Calculate handicap strokes for a player on a specific hole
-  const calculateHandicapStrokes = (playerHandicap: number, holeHandicapIndex: number) => {
-    if (playerHandicap <= 0) return 0;
-    
-    // Players get strokes on the hardest holes up to their handicap
-    return playerHandicap >= holeHandicapIndex ? 1 : 0;
-  };
-  
-  // Get player's course handicap
-  const getPlayerCourseHandicap = (playerId: number) => {
-    const handicapData = roundHandicapData.find((data: any) => data.playerId === playerId);
-    return handicapData?.courseHandicap || 0;
-  };
-  
-  // Mutation for saving scores via regular player_scores endpoint
-  const savePlayerScoreMutation = useMutation({
-    mutationFn: async ({
-      holeNumber,
-      playerId,
-      matchId,
-      score,
-    }: {
-      holeNumber: number;
-      playerId: number;
-      matchId: number;
-      score: number;
-    }) => {
-      const response = await apiRequest("POST", `/api/player-scores`, {
-        holeNumber,
-        playerId,
-        matchId,
-        score,
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to save player score");
-      }
-      
-      return await response.json();
+    // Check if any of the user's players are participants in this match
+    return participants.some((p: any) => 
+      userPlayerIds.includes(p.playerId)
+    );
+  }, [isAdmin, user, allPlayers, participants]);
+
+  // Split holes into front and back nine
+  const frontNine = holes.filter((hole: any) => hole.number <= 9)
+    .sort((a: any, b: any) => a.number - b.number);
+  const backNine = holes.filter((hole: any) => hole.number > 9)
+    .sort((a: any, b: any) => a.number - b.number);
+
+  // Fetch player scores from the server
+  const { data: savedScores, isLoading } = useQuery({
+    queryKey: ['/api/player-scores', matchId],
+    retry: false,
+    enabled: !!matchId,
+  });
+
+  // Mutation to save player scores
+  const saveMutation = useMutation({
+    mutationFn: async (score: any) => {
+      return await apiRequest(
+        score.id ? 'PUT' : 'POST',
+        `/api/player-scores${score.id ? `/${score.id}` : ''}`,
+        score
+      ).then(res => res.json());
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/player-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/matches', matchId] });
     },
   });
-  
-  // Mutation for updating match score
-  const updateMatchScoreMutation = useMutation({
-    mutationFn: async (scoreData: any) => {
-      const response = await apiRequest("PUT", `/api/matches/${matchId}`, scoreData);
-      
-      if (!response.ok) {
-        throw new Error("Failed to update match score");
-      }
-      
-      return await response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/matches/${matchId}`] });
-    },
-  });
-  
-  // Check if hole should be greyed out (not in use)
-  const isHoleGreyedOut = (holeNumber: number) => {
-    // Grey out holes that are not in the course
-    return !holes.some((h: any) => h.number === holeNumber);
-  };
-  
-  // Initialize player scores map from data on first load
+
+  // Initialize or update the score map when player scores change
   useEffect(() => {
-    if (!holes || holes.length === 0 || !aviatorPlayersList || !producerPlayersList) {
-      setLoading(false);
-      return;
-    }
+    if (!savedScores || savedScores.length === 0) return;
     
-    // Create a new scores map
-    const newScores = new Map<string, BestBallPlayerScore[]>();
+    const scoreMap = new Map<string, BestBallPlayerScore[]>();
     
-    // Initialize with empty scores for all players and holes first
-    holes.forEach((hole: any) => {
-      const allPlayers = [...(aviatorPlayersList || []), ...(producerPlayersList || [])];
+    savedScores.forEach((score: any) => {
+      // Find the player info
+      const participant = participants.find((p: any) => p.playerId === score.playerId);
+      const player = allPlayers.find((p: any) => p.id === score.playerId);
       
-      allPlayers.forEach((player: any) => {
-        if (!player || !player.name) return; // Skip if player data is incomplete
-        
-        const key = `${hole.number}-${player.name}`;
-        const team = participants.find((p: any) => p.playerId === player.id)?.team;
-        
-        if (!newScores.has(key)) {
-          newScores.set(key, []);
-        }
-        
-        // Add the handicap strokes for this player/hole
-        const playerHandicap = getPlayerCourseHandicap(player.id);
-        const handicapStrokes = calculateHandicapStrokes(playerHandicap, hole?.handicapIndex || 18);
-        
-        newScores.get(key)?.push({
-          player: player.name,
-          score: null,
-          teamId: team === "aviators" ? "1" : "2",
-          playerId: player.id,
-          handicapStrokes: handicapStrokes || 0,
-          netScore: null
-        });
+      if (!player || !participant) return;
+      
+      // Get player handicap
+      const courseHandicap = getPlayerCourseHandicap(player.id);
+      
+      // Get the hole info for handicap strokes
+      const hole = holes.find((h: any) => h.number === score.holeNumber);
+      const handicapStrokes = hole && courseHandicap >= hole.handicapIndex ? 1 : 0;
+      
+      // Calculate net score
+      const netScore = score.score !== null 
+        ? score.score - handicapStrokes
+        : null;
+      
+      // Create key in format "holeNumber-playerName"
+      const key = `${score.holeNumber}-${player.name}`;
+      
+      // Create or get the array for this key
+      const scores = scoreMap.get(key) || [];
+      
+      // Add this score
+      scores.push({
+        player: player.name,
+        score: score.score,
+        teamId: participant.team,
+        playerId: player.id,
+        handicapStrokes: handicapStrokes,
+        netScore: netScore
       });
+      
+      // Update the map
+      scoreMap.set(key, scores);
     });
     
-    // Then overlay with existing scores if available
-    if (playerScoresData?.length > 0) {
-      playerScoresData.forEach((score: any) => {
-        if (!score || !score.playerId || !score.holeNumber) return; // Skip invalid scores
+    setPlayerScores(scoreMap);
+  }, [savedScores, participants, allPlayers, holes]);
+
+  // Handler for score input change
+  const handleScoreChange = async (
+    holeNumber: number,
+    playerId: number,
+    newScore: number | null
+  ) => {
+    if (locked || !canEditScores) return;
+    
+    // Find existing score in the saved scores
+    const existingScore = savedScores?.find(
+      (s: any) => s.playerId === playerId && s.holeNumber === holeNumber
+    );
+    
+    // Create new score object for the API
+    const scoreData = {
+      id: existingScore?.id,
+      matchId,
+      playerId,
+      holeNumber,
+      score: newScore
+    };
+    
+    // Save to the server
+    setIsSubmitting(true);
+    try {
+      await saveMutation.mutateAsync(scoreData);
+    } catch (error) {
+      console.error("Error saving score:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Helper to get player's course handicap
+  const getPlayerCourseHandicap = (playerId: number): number => {
+    // Find from the round handicap data
+    const handicapData = roundHandicapData.find((h: any) => h.playerId === playerId);
+    if (handicapData) return handicapData.courseHandicap || 0;
+    
+    // Use default from player data if not in round data
+    const player = allPlayers.find((p: any) => p.id === playerId);
+    return player?.handicap || 0;
+  };
+
+  // Calculate scores for each team and format for display
+  const calculateTeamScores = () => {
+    // Initialize totals 
+    const aviatorFrontTotals = {
+      teamGrossTotal: 0,
+      teamNetTotal: 0,
+      frontGrossTotal: 0,
+      frontNetTotal: 0,
+      backGrossTotal: 0,
+      backNetTotal: 0,
+      playerTotals: aviatorPlayersList.map(p => ({
+        name: p.name,
+        id: p.id,
+        frontGross: 0,
+        frontNet: 0,
+        backGross: 0,
+        backNet: 0,
+        totalGross: 0,
+        totalNet: 0
+      }))
+    };
+    
+    const producerFrontTotals = {
+      teamGrossTotal: 0,
+      teamNetTotal: 0,
+      frontGrossTotal: 0,
+      frontNetTotal: 0,
+      backGrossTotal: 0,
+      backNetTotal: 0,
+      playerTotals: producerPlayersList.map(p => ({
+        name: p.name,
+        id: p.id,
+        frontGross: 0,
+        frontNet: 0,
+        backGross: 0,
+        backNet: 0,
+        totalGross: 0,
+        totalNet: 0
+      }))
+    };
+    
+    // Process front nine
+    frontNine.forEach(hole => {
+      // Process aviator players
+      const aviatorHoleScores: { gross: number | null, net: number | null }[] = [];
+      
+      aviatorPlayersList.forEach(player => {
+        const key = `${hole.number}-${player.name}`;
+        const playerScoreData = playerScores.get(key)?.[0];
         
-        const player = allPlayers?.find((p: any) => p.id === score.playerId);
-        if (player && player.name) {
-          const key = `${score.holeNumber}-${player.name}`;
+        // Update player total
+        const playerTotal = aviatorFrontTotals.playerTotals.find(p => p.id === player.id);
+        if (playerTotal && playerScoreData?.score !== null && playerScoreData?.score !== undefined) {
+          playerTotal.frontGross += playerScoreData.score;
+          playerTotal.totalGross += playerScoreData.score;
           
-          if (newScores.has(key) && newScores.get(key)?.length > 0) {
-            const playerScore = newScores.get(key)?.[0];
-            if (playerScore) {
-              const playerHandicap = getPlayerCourseHandicap(player.id);
-              const hole = holes.find((h: any) => h.number === score.holeNumber);
-              const handicapStrokes = calculateHandicapStrokes(playerHandicap, hole?.handicapIndex || 18);
-              
-              const netScore = score.score !== null 
-                ? Math.max(1, score.score - handicapStrokes) 
-                : null;
-                
-              // Update the existing score object
-              playerScore.score = score.score;
-              playerScore.handicapStrokes = handicapStrokes || 0;
-              playerScore.netScore = netScore;
-            }
+          if (playerScoreData.netScore !== null && playerScoreData.netScore !== undefined) {
+            playerTotal.frontNet += playerScoreData.netScore;
+            playerTotal.totalNet += playerScoreData.netScore;
           }
         }
+        
+        // Add to hole scores for team calculation
+        if (playerScoreData) {
+          aviatorHoleScores.push({
+            gross: playerScoreData.score,
+            net: playerScoreData.netScore
+          });
+        }
       });
-    }
-    
-    setPlayerScores(newScores);
-    setLoading(false);
-  }, [playerScoresData, holes, aviatorPlayersList, producerPlayersList, allPlayers, participants]);
-  
-  // Check if a player score is the lowest for their team on that hole
-  const isLowestScore = (holeNumber: number, playerName: string, team: string) => {
-    const teamPlayersList = team === "aviator" ? aviatorPlayersList : producerPlayersList;
-    const teamPlayerNames = teamPlayersList.map((p: any) => p.name);
-    
-    let lowestNetScore = Infinity;
-    let playerWithLowestScore = "";
-    
-    // Find the lowest net score for this team on this hole
-    teamPlayerNames.forEach((name: string) => {
-      const key = `${holeNumber}-${name}`;
-      const playerScoreData = playerScores.get(key)?.[0];
       
-      if (playerScoreData && playerScoreData.netScore !== null && playerScoreData.netScore < lowestNetScore) {
-        lowestNetScore = playerScoreData.netScore;
-        playerWithLowestScore = name;
+      // Calculate best ball score for this hole
+      const bestGross = Math.min(...aviatorHoleScores.filter(s => s.gross !== null).map(s => s.gross || 99));
+      const bestNet = Math.min(...aviatorHoleScores.filter(s => s.net !== null).map(s => s.net || 99));
+      
+      if (bestGross !== Infinity) {
+        aviatorFrontTotals.frontGrossTotal += bestGross;
+        aviatorFrontTotals.teamGrossTotal += bestGross;
+      }
+      
+      if (bestNet !== Infinity) {
+        aviatorFrontTotals.frontNetTotal += bestNet;
+        aviatorFrontTotals.teamNetTotal += bestNet;
+      }
+      
+      // Process producer players
+      const producerHoleScores: { gross: number | null, net: number | null }[] = [];
+      
+      producerPlayersList.forEach(player => {
+        const key = `${hole.number}-${player.name}`;
+        const playerScoreData = playerScores.get(key)?.[0];
+        
+        // Update player total
+        const playerTotal = producerFrontTotals.playerTotals.find(p => p.id === player.id);
+        if (playerTotal && playerScoreData?.score !== null && playerScoreData?.score !== undefined) {
+          playerTotal.frontGross += playerScoreData.score;
+          playerTotal.totalGross += playerScoreData.score;
+          
+          if (playerScoreData.netScore !== null && playerScoreData.netScore !== undefined) {
+            playerTotal.frontNet += playerScoreData.netScore;
+            playerTotal.totalNet += playerScoreData.netScore;
+          }
+        }
+        
+        // Add to hole scores for team calculation
+        if (playerScoreData) {
+          producerHoleScores.push({
+            gross: playerScoreData.score,
+            net: playerScoreData.netScore
+          });
+        }
+      });
+      
+      // Calculate best ball score for this hole
+      const bestProducerGross = Math.min(...producerHoleScores.filter(s => s.gross !== null).map(s => s.gross || 99));
+      const bestProducerNet = Math.min(...producerHoleScores.filter(s => s.net !== null).map(s => s.net || 99));
+      
+      if (bestProducerGross !== Infinity) {
+        producerFrontTotals.frontGrossTotal += bestProducerGross;
+        producerFrontTotals.teamGrossTotal += bestProducerGross;
+      }
+      
+      if (bestProducerNet !== Infinity) {
+        producerFrontTotals.frontNetTotal += bestProducerNet;
+        producerFrontTotals.teamNetTotal += bestProducerNet;
       }
     });
     
-    return playerName === playerWithLowestScore && lowestNetScore !== Infinity;
+    // Process back nine (same logic as front nine)
+    backNine.forEach(hole => {
+      // Process aviator players
+      const aviatorHoleScores: { gross: number | null, net: number | null }[] = [];
+      
+      aviatorPlayersList.forEach(player => {
+        const key = `${hole.number}-${player.name}`;
+        const playerScoreData = playerScores.get(key)?.[0];
+        
+        // Update player total
+        const playerTotal = aviatorFrontTotals.playerTotals.find(p => p.id === player.id);
+        if (playerTotal && playerScoreData?.score !== null && playerScoreData?.score !== undefined) {
+          playerTotal.backGross += playerScoreData.score;
+          playerTotal.totalGross += playerScoreData.score;
+          
+          if (playerScoreData.netScore !== null && playerScoreData.netScore !== undefined) {
+            playerTotal.backNet += playerScoreData.netScore;
+            playerTotal.totalNet += playerScoreData.netScore;
+          }
+        }
+        
+        // Add to hole scores for team calculation
+        if (playerScoreData) {
+          aviatorHoleScores.push({
+            gross: playerScoreData.score,
+            net: playerScoreData.netScore
+          });
+        }
+      });
+      
+      // Calculate best ball score for this hole
+      const bestGross = Math.min(...aviatorHoleScores.filter(s => s.gross !== null).map(s => s.gross || 99));
+      const bestNet = Math.min(...aviatorHoleScores.filter(s => s.net !== null).map(s => s.net || 99));
+      
+      if (bestGross !== Infinity) {
+        aviatorFrontTotals.backGrossTotal += bestGross;
+        aviatorFrontTotals.teamGrossTotal += bestGross;
+      }
+      
+      if (bestNet !== Infinity) {
+        aviatorFrontTotals.backNetTotal += bestNet;
+        aviatorFrontTotals.teamNetTotal += bestNet;
+      }
+      
+      // Process producer players
+      const producerHoleScores: { gross: number | null, net: number | null }[] = [];
+      
+      producerPlayersList.forEach(player => {
+        const key = `${hole.number}-${player.name}`;
+        const playerScoreData = playerScores.get(key)?.[0];
+        
+        // Update player total
+        const playerTotal = producerFrontTotals.playerTotals.find(p => p.id === player.id);
+        if (playerTotal && playerScoreData?.score !== null && playerScoreData?.score !== undefined) {
+          playerTotal.backGross += playerScoreData.score;
+          playerTotal.totalGross += playerScoreData.score;
+          
+          if (playerScoreData.netScore !== null && playerScoreData.netScore !== undefined) {
+            playerTotal.backNet += playerScoreData.netScore;
+            playerTotal.totalNet += playerScoreData.netScore;
+          }
+        }
+        
+        // Add to hole scores for team calculation
+        if (playerScoreData) {
+          producerHoleScores.push({
+            gross: playerScoreData.score,
+            net: playerScoreData.netScore
+          });
+        }
+      });
+      
+      // Calculate best ball score for this hole
+      const bestProducerGross = Math.min(...producerHoleScores.filter(s => s.gross !== null).map(s => s.gross || 99));
+      const bestProducerNet = Math.min(...producerHoleScores.filter(s => s.net !== null).map(s => s.net || 99));
+      
+      if (bestProducerGross !== Infinity) {
+        producerFrontTotals.backGrossTotal += bestProducerGross;
+        producerFrontTotals.teamGrossTotal += bestProducerGross;
+      }
+      
+      if (bestProducerNet !== Infinity) {
+        producerFrontTotals.backNetTotal += bestProducerNet;
+        producerFrontTotals.teamNetTotal += bestProducerNet;
+      }
+    });
+    
+    return { aviatorFrontTotals, producerFrontTotals };
   };
-  
-  // Handle score change for a player
-  const handlePlayerScoreChange = (
+
+  // Calculate and memoize team scores
+  const { aviatorFrontTotals, producerFrontTotals } = useMemo(
+    calculateTeamScores,
+    [playerScores, aviatorPlayersList, producerPlayersList, frontNine, backNine]
+  );
+
+  // Check if a score is the best net score for its team
+  const isBestNetScore = (
     holeNumber: number,
-    playerName: string,
-    team: string,
-    value: string,
-    target: HTMLInputElement
-  ) => {
-    if (locked) return; // Don't allow changes if scorecard is locked
+    playerId: number,
+    netScore: number | null
+  ): boolean => {
+    if (netScore === null) return false;
     
-    const key = `${holeNumber}-${playerName}`;
-    const existingScores = playerScores.get(key) || [];
+    // Find the participant to determine the team
+    const participant = participants.find((p: any) => p.playerId === playerId);
+    if (!participant) return false;
     
-    if (existingScores.length === 0) return;
+    // Get the player list for this team
+    const teamPlayers = participant.team === "aviators" 
+      ? aviatorPlayersList
+      : producerPlayersList;
     
-    const scoreData = { ...existingScores[0] };
-    const score = value === "" ? null : Math.max(1, parseInt(value, 10));
+    // Check all player scores for this hole and find the best net score
+    const teamScores: (number | null)[] = teamPlayers.map(player => {
+      const key = `${holeNumber}-${player.name}`;
+      return playerScores.get(key)?.[0]?.netScore || null;
+    }).filter(score => score !== null);
     
-    // Calculate net score
-    const netScore = score !== null 
-      ? Math.max(1, score - scoreData.handicapStrokes) 
-      : null;
+    // If there are no scores or this is the only score, it's the best
+    if (teamScores.length === 0) return true;
     
-    // Update scores map
-    const updatedScores = new Map(playerScores);
-    updatedScores.set(key, [{ ...scoreData, score, netScore }]);
-    setPlayerScores(updatedScores);
-    
-    // Save to database using regular player_scores endpoint
-    if (score !== null) {
-      savePlayerScoreMutation.mutate({
-        holeNumber,
-        playerId: scoreData.playerId,
-        matchId,
-        score,
-      });
-    }
-    
-    // Move to next input if appropriate
-    if (value.length >= 1 && !isNaN(score as number)) {
-      const inputs = Array.from(document.querySelectorAll('input[type="number"]'));
-      const currentIndex = inputs.indexOf(target);
-      
-      if (currentIndex !== -1 && currentIndex < inputs.length - 1) {
-        const nextInput = inputs[currentIndex + 1] as HTMLInputElement;
-        if (nextInput && !nextInput.disabled) {
-          nextInput.focus();
-        }
-      }
-    }
-    
-    // Update match score if needed
-    calculateAndUpdateMatchScore();
+    // Check if this score is the lowest
+    const minScore = Math.min(...teamScores.map(s => s !== null ? s : 99));
+    return netScore === minScore;
   };
-  
-  // Calculate and update the overall match score
-  const calculateAndUpdateMatchScore = () => {
-    // Calculate team totals
-    const aviatorTotal = calculateTeamTotal("aviator");
-    const producerTotal = calculateTeamTotal("producer");
-    
-    // Determine the match result
-    let result = "";
-    if (aviatorTotal.teamNetTotal < producerTotal.teamNetTotal) {
-      result = "aviators";
-    } else if (producerTotal.teamNetTotal < aviatorTotal.teamNetTotal) {
-      result = "producers";
-    } else if (aviatorTotal.teamNetTotal === producerTotal.teamNetTotal) {
-      result = "tie";
-    }
-    
-    // Update match with new score
-    if (onScoreUpdate) {
-      onScoreUpdate({
-        aviatorScore: aviatorTotal.teamNetTotal,
-        producerScore: producerTotal.teamNetTotal,
-        result,
-      });
-    }
-    
-    // Also update match in database
-    updateMatchScoreMutation.mutate({
-      aviatorScore: aviatorTotal.teamNetTotal,
-      producerScore: producerTotal.teamNetTotal,
-      result,
-      status: "in_progress"
-    });
-  };
-  
-  // Calculate team totals for a given team
-  const calculateTeamTotal = (team: string) => {
-    const teamPlayersList = team === "aviator" ? aviatorPlayersList : producerPlayersList;
-    const teamPlayerNames = teamPlayersList.map((p: any) => p.name);
-    
-    let frontGrossTotal = 0;
-    let frontNetTotal = 0;
-    let backGrossTotal = 0;
-    let backNetTotal = 0;
-    
-    // Calculate front nine total
-    frontNine.forEach((hole) => {
-      let lowestNetScore = Infinity;
-      
-      teamPlayerNames.forEach((name: string) => {
-        const key = `${hole.number}-${name}`;
-        const playerScoreData = playerScores.get(key)?.[0];
-        
-        if (playerScoreData && playerScoreData.netScore !== null && playerScoreData.netScore < lowestNetScore) {
-          lowestNetScore = playerScoreData.netScore;
-        }
-      });
-      
-      if (lowestNetScore !== Infinity) {
-        frontNetTotal += lowestNetScore;
-      }
-    });
-    
-    // Calculate back nine total
-    backNine.forEach((hole) => {
-      let lowestNetScore = Infinity;
-      
-      teamPlayerNames.forEach((name: string) => {
-        const key = `${hole.number}-${name}`;
-        const playerScoreData = playerScores.get(key)?.[0];
-        
-        if (playerScoreData && playerScoreData.netScore !== null && playerScoreData.netScore < lowestNetScore) {
-          lowestNetScore = playerScoreData.netScore;
-        }
-      });
-      
-      if (lowestNetScore !== Infinity) {
-        backNetTotal += lowestNetScore;
-      }
-    });
-    
-    // Calculate individual player totals
-    const playerTotals = teamPlayerNames.map((name: string) => {
-      let grossTotal = 0;
-      let netTotal = 0;
-      let frontGross = 0;
-      let frontNet = 0;
-      let backGross = 0;
-      let backNet = 0;
-      
-      // Front nine
-      frontNine.forEach((hole) => {
-        const key = `${hole.number}-${name}`;
-        const scoreData = playerScores.get(key)?.[0];
-        
-        if (scoreData && scoreData.score !== null) {
-          frontGross += scoreData.score;
-          frontNet += (scoreData.netScore !== null ? scoreData.netScore : scoreData.score);
-        }
-      });
-      
-      // Back nine
-      backNine.forEach((hole) => {
-        const key = `${hole.number}-${name}`;
-        const scoreData = playerScores.get(key)?.[0];
-        
-        if (scoreData && scoreData.score !== null) {
-          backGross += scoreData.score;
-          backNet += (scoreData.netScore !== null ? scoreData.netScore : scoreData.score);
-        }
-      });
-      
-      grossTotal = frontGross + backGross;
-      netTotal = frontNet + backNet;
-      
-      return {
-        name,
-        grossTotal,
-        netTotal,
-        frontGross,
-        frontNet,
-        backGross,
-        backNet
-      };
-    });
-    
-    return {
-      teamGrossTotal: frontGrossTotal + backGrossTotal,
-      teamNetTotal: frontNetTotal + backNetTotal,
-      frontGrossTotal,
-      frontNetTotal,
-      backGrossTotal,
-      backNetTotal,
-      playerTotals
-    };
-  };
-  
-  // Calculate team totals for display
-  const aviatorFrontTotals = useMemo(() => calculateTeamTotal("aviator"), [playerScores, frontNine, backNine]);
-  const producerFrontTotals = useMemo(() => calculateTeamTotal("producer"), [playerScores, frontNine, backNine]);
-  
-  // Check if data is still loading
-  if (loading) {
+
+  // Show loading skeleton when data is loading
+  if (isLoading) {
     return (
-      <div className="best-ball-scorecard-container">
-        <Skeleton className="h-12 w-full mb-4" />
-        <Skeleton className="h-64 w-full" />
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-80 w-full" />
       </div>
     );
   }
@@ -475,107 +461,78 @@ export default function BestBallScorecard({
   // Return the scorecard UI
   return (
     <div className="best-ball-scorecard-container">
-      <div className="scorecard-status">
-        <div className="match-info">
-          <span>{matchData?.name || "Match"}</span>
-          {matchData?.status === "completed" && (
-            <span className="status completed">Completed</span>
-          )}
-          {matchData?.status === "in_progress" && (
-            <span className="status in-progress">In Progress</span>
-          )}
-        </div>
-        
-        {canEditScores && (
-          <div className="scorecard-controls">
-            <button 
-              onClick={() => setLocked(!locked)}
-              className={`lock-button ${locked ? 'locked' : 'unlocked'}`}
-            >
-              {locked ? '🔒 Unlock' : '🔓 Lock'}
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Match status handled by parent Match component, no need to duplicate */}
       
-      <div className={`scorecard ${isMobile ? 'mobile' : ''}`}>
+      <div className={`scorecard-grid ${isMobile ? 'mobile' : ''}`}>
         {/* Desktop version shows all 18 holes */}
         {!isMobile && (
-          <div className="scorecard-grid">
-            {/* Header Row */}
-            <div className="header-row">
-              <div className="player-header">Player</div>
-              <div className="handicap-header">HCP</div>
-              {frontNine.map((hole) => (
-                <div key={`hole-${hole.number}`} className="hole-number">
-                  {hole.number}
-                </div>
-              ))}
-              <div className="total-header">OUT</div>
-              
-              {backNine.map((hole) => (
-                <div key={`hole-${hole.number}`} className="hole-number">
-                  {hole.number}
-                </div>
-              ))}
-              <div className="total-header">IN</div>
-              <div className="total-header">TOT</div>
-            </div>
-            
-            {/* Par Row */}
-            <div className="par-row">
-              <div className="par-label">Par</div>
-              <div className="empty"></div>
-              {frontNine.map((hole) => (
-                <div key={`par-${hole.number}`} className="par-value">
-                  {hole.par}
-                </div>
-              ))}
-              <div className="total-value">{frontNinePar}</div>
-              
-              {backNine.map((hole) => (
-                <div key={`par-${hole.number}`} className="par-value">
-                  {hole.par}
-                </div>
-              ))}
-              <div className="total-value">{backNinePar}</div>
-              <div className="total-value">{totalPar}</div>
-            </div>
-            
-            {/* Handicap Row */}
-            <div className="handicap-row">
-              <div className="handicap-label">Handicap</div>
-              <div className="empty"></div>
-              {frontNine.map((hole) => (
-                <div key={`handicap-${hole.number}`} className="handicap-value">
-                  {hole.handicapIndex}
-                </div>
-              ))}
-              <div className="empty"></div>
-              
-              {backNine.map((hole) => (
-                <div key={`handicap-${hole.number}`} className="handicap-value">
-                  {hole.handicapIndex}
-                </div>
-              ))}
-              <div className="empty"></div>
-              <div className="empty"></div>
-            </div>
-            
-            {/* Aviators Team */}
-            <div className="team-header aviators">Aviators</div>
-            <div className="empty"></div>
+          <>
+            {/* Header row */}
+            <div className="player-header">Hole</div>
+            <div className="handicap-header">HC</div>
             {frontNine.map((hole) => (
-              <div key={`aviator-${hole.number}`} className="team-best-ball">
-                {/* Team best ball score will go here */}
+              <div key={`header-${hole.number}`} className="hole-number">
+                {hole.number}
               </div>
             ))}
-            <div className="team-total">{aviatorFrontTotals.frontNetTotal}</div>
-            
+            <div className="total-header">Out</div>
             {backNine.map((hole) => (
-              <div key={`aviator-back-${hole.number}`} className="team-best-ball">
-                {/* Team best ball score will go here */}
+              <div key={`header-${hole.number}`} className="hole-number">
+                {hole.number}
               </div>
+            ))}
+            <div className="total-header">In</div>
+            <div className="total-header">Tot</div>
+            
+            {/* Par row */}
+            <div className="par-label">Par</div>
+            <div className="empty"></div>
+            {frontNine.map((hole) => (
+              <div key={`par-${hole.number}`} className="par-value">
+                {hole.par}
+              </div>
+            ))}
+            <div className="par-total">
+              {frontNine.reduce((acc, hole) => acc + hole.par, 0)}
+            </div>
+            {backNine.map((hole) => (
+              <div key={`par-${hole.number}`} className="par-value">
+                {hole.par}
+              </div>
+            ))}
+            <div className="par-total">
+              {backNine.reduce((acc, hole) => acc + hole.par, 0)}
+            </div>
+            <div className="par-total">
+              {holes.reduce((acc, hole) => acc + hole.par, 0)}
+            </div>
+            
+            {/* Handicap row */}
+            <div className="handicap-label">Handicap</div>
+            <div className="empty"></div>
+            {frontNine.map((hole) => (
+              <div key={`handicap-${hole.number}`} className="handicap-value">
+                {hole.handicapIndex}
+              </div>
+            ))}
+            <div className="empty"></div>
+            {backNine.map((hole) => (
+              <div key={`handicap-${hole.number}`} className="handicap-value">
+                {hole.handicapIndex}
+              </div>
+            ))}
+            <div className="empty"></div>
+            <div className="empty"></div>
+            
+            {/* Team headers */}
+            <div className="team-header aviators">The Aviators</div>
+            <div className="empty"></div>
+            {frontNine.map((hole) => (
+              <div key={`aviator-team-${hole.number}`} className="empty"></div>
+            ))}
+            <div className="team-total">{aviatorFrontTotals.frontNetTotal}</div>
+            {backNine.map((hole) => (
+              <div key={`aviator-team-${hole.number}`} className="empty"></div>
             ))}
             <div className="team-total">{aviatorFrontTotals.backNetTotal}</div>
             <div className="team-total">{aviatorFrontTotals.teamNetTotal}</div>
@@ -590,102 +547,116 @@ export default function BestBallScorecard({
                 {frontNine.map((hole) => {
                   const playerKey = `${hole.number}-${player.name}`;
                   const scoreData = playerScores.get(playerKey)?.[0];
+                  const isBest = scoreData?.netScore !== null && 
+                    isBestNetScore(hole.number, player.id, scoreData?.netScore);
+                  
                   return (
                     <div 
-                      key={`score-${player.id}-${hole.number}`} 
-                      className={`score-input-cell ${isLowestScore(hole.number, player.name, "aviator") ? 'best-score' : ''}`}
+                      key={`front-${hole.number}-${player.id}`} 
+                      className={`score-input-cell ${isBest ? 'best-score' : ''}`}
                     >
                       <input
                         type="number"
-                        value={scoreData && scoreData.score !== null ? scoreData.score.toString() : ''}
-                        onChange={(e) =>
-                          handlePlayerScoreChange(
-                            hole.number,
-                            player.name,
-                            "aviator",
-                            e.target.value,
-                            e.target
-                          )
-                        }
                         min="1"
-                        max="12"
-                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
+                        max="20"
+                        value={scoreData?.score !== null ? scoreData?.score : ''}
+                        disabled={locked || !canEditScores || isSubmitting}
+                        onChange={(e) => {
+                          const newValue = e.target.value 
+                            ? parseInt(e.target.value, 10) 
+                            : null;
+                          handleScoreChange(hole.number, player.id, newValue);
+                        }}
+                        onBlur={(e) => {
+                          const newValue = e.target.value
+                            ? parseInt(e.target.value, 10)
+                            : null;
+                          if (newValue !== null && (newValue < 1 || newValue > 20)) {
+                            e.target.value = '';
+                            handleScoreChange(hole.number, player.id, null);
+                          }
+                        }}
                       />
-                      {/* Net Score Display - only show when score is entered and player has handicap strokes on this hole */}
-                      {scoreData && 
-                       scoreData.score !== null && 
-                       scoreData.handicapStrokes > 0 && (
-                        <span className="net-score">
-                          {scoreData.netScore}
-                          <span className="handicap-dot">•</span>
-                        </span>
+                      {scoreData?.handicapStrokes > 0 && (
+                        <span className="handicap-dot">•</span>
+                      )}
+                      {scoreData?.netScore !== null && (
+                        <span className="net-score">{scoreData.netScore}</span>
                       )}
                     </div>
                   );
                 })}
+                
+                {/* Front nine total */}
                 <div className="player-total">
-                  {aviatorFrontTotals.playerTotals.find(p => p.name === player.name)?.frontNet || ''}
+                  {aviatorFrontTotals.playerTotals.find(p => p.id === player.id)?.frontNet || '-'}
                 </div>
                 
+                {/* Back nine scores */}
                 {backNine.map((hole) => {
                   const playerKey = `${hole.number}-${player.name}`;
                   const scoreData = playerScores.get(playerKey)?.[0];
+                  const isBest = scoreData?.netScore !== null && 
+                    isBestNetScore(hole.number, player.id, scoreData?.netScore);
+                  
                   return (
                     <div 
-                      key={`score-${player.id}-${hole.number}`}
-                      className={`score-input-cell ${isLowestScore(hole.number, player.name, "aviator") ? 'best-score' : ''}`}
+                      key={`back-${hole.number}-${player.id}`} 
+                      className={`score-input-cell ${isBest ? 'best-score' : ''}`}
                     >
                       <input
                         type="number"
-                        value={scoreData && scoreData.score !== null ? scoreData.score.toString() : ''}
-                        onChange={(e) =>
-                          handlePlayerScoreChange(
-                            hole.number,
-                            player.name,
-                            "aviator",
-                            e.target.value,
-                            e.target
-                          )
-                        }
                         min="1"
-                        max="12"
-                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
+                        max="20"
+                        value={scoreData?.score !== null ? scoreData?.score : ''}
+                        disabled={locked || !canEditScores || isSubmitting}
+                        onChange={(e) => {
+                          const newValue = e.target.value 
+                            ? parseInt(e.target.value, 10) 
+                            : null;
+                          handleScoreChange(hole.number, player.id, newValue);
+                        }}
+                        onBlur={(e) => {
+                          const newValue = e.target.value
+                            ? parseInt(e.target.value, 10)
+                            : null;
+                          if (newValue !== null && (newValue < 1 || newValue > 20)) {
+                            e.target.value = '';
+                            handleScoreChange(hole.number, player.id, null);
+                          }
+                        }}
                       />
-                      {/* Net Score Display */}
-                      {scoreData && 
-                       scoreData.score !== null && 
-                       scoreData.handicapStrokes > 0 && (
-                        <span className="net-score">
-                          {scoreData.netScore}
-                          <span className="handicap-dot">•</span>
-                        </span>
+                      {scoreData?.handicapStrokes > 0 && (
+                        <span className="handicap-dot">•</span>
+                      )}
+                      {scoreData?.netScore !== null && (
+                        <span className="net-score">{scoreData.netScore}</span>
                       )}
                     </div>
                   );
                 })}
+                
+                {/* Back nine total */}
                 <div className="player-total">
-                  {aviatorFrontTotals.playerTotals.find(p => p.name === player.name)?.backNet || ''}
+                  {aviatorFrontTotals.playerTotals.find(p => p.id === player.id)?.backNet || '-'}
                 </div>
+                
+                {/* Overall total */}
                 <div className="player-total">
-                  {aviatorFrontTotals.playerTotals.find(p => p.name === player.name)?.netTotal || ''}
+                  {aviatorFrontTotals.playerTotals.find(p => p.id === player.id)?.totalNet || '-'}
                 </div>
               </React.Fragment>
             ))}
             
-            {/* Producers Team */}
-            <div className="team-header producers">Producers</div>
+            {/* Producer team header */}
+            <div className="team-header producers">The Producers</div>
             <div className="empty"></div>
             {frontNine.map((hole) => (
-              <div key={`producer-${hole.number}`} className="team-best-ball">
-                {/* Team best ball score will go here */}
-              </div>
+              <div key={`producer-team-${hole.number}`} className="empty"></div>
             ))}
             <div className="team-total">{producerFrontTotals.frontNetTotal}</div>
-            
             {backNine.map((hole) => (
-              <div key={`producer-back-${hole.number}`} className="team-best-ball">
-                {/* Team best ball score will go here */}
-              </div>
+              <div key={`producer-team-${hole.number}`} className="empty"></div>
             ))}
             <div className="team-total">{producerFrontTotals.backNetTotal}</div>
             <div className="team-total">{producerFrontTotals.teamNetTotal}</div>
@@ -700,97 +671,111 @@ export default function BestBallScorecard({
                 {frontNine.map((hole) => {
                   const playerKey = `${hole.number}-${player.name}`;
                   const scoreData = playerScores.get(playerKey)?.[0];
+                  const isBest = scoreData?.netScore !== null && 
+                    isBestNetScore(hole.number, player.id, scoreData?.netScore);
+                  
                   return (
                     <div 
-                      key={`score-${player.id}-${hole.number}`}
-                      className={`score-input-cell ${isLowestScore(hole.number, player.name, "producer") ? 'best-score' : ''}`}
+                      key={`front-${hole.number}-${player.id}`} 
+                      className={`score-input-cell ${isBest ? 'best-score' : ''}`}
                     >
                       <input
                         type="number"
-                        value={scoreData && scoreData.score !== null ? scoreData.score.toString() : ''}
-                        onChange={(e) =>
-                          handlePlayerScoreChange(
-                            hole.number,
-                            player.name,
-                            "producer",
-                            e.target.value,
-                            e.target
-                          )
-                        }
                         min="1"
-                        max="12"
-                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
+                        max="20"
+                        value={scoreData?.score !== null ? scoreData?.score : ''}
+                        disabled={locked || !canEditScores || isSubmitting}
+                        onChange={(e) => {
+                          const newValue = e.target.value 
+                            ? parseInt(e.target.value, 10) 
+                            : null;
+                          handleScoreChange(hole.number, player.id, newValue);
+                        }}
+                        onBlur={(e) => {
+                          const newValue = e.target.value
+                            ? parseInt(e.target.value, 10)
+                            : null;
+                          if (newValue !== null && (newValue < 1 || newValue > 20)) {
+                            e.target.value = '';
+                            handleScoreChange(hole.number, player.id, null);
+                          }
+                        }}
                       />
-                      {/* Net Score Display */}
-                      {scoreData && 
-                       scoreData.score !== null && 
-                       scoreData.handicapStrokes > 0 && (
-                        <span className="net-score">
-                          {scoreData.netScore}
-                          <span className="handicap-dot">•</span>
-                        </span>
+                      {scoreData?.handicapStrokes > 0 && (
+                        <span className="handicap-dot">•</span>
+                      )}
+                      {scoreData?.netScore !== null && (
+                        <span className="net-score">{scoreData.netScore}</span>
                       )}
                     </div>
                   );
                 })}
+                
+                {/* Front nine total */}
                 <div className="player-total">
-                  {producerFrontTotals.playerTotals.find(p => p.name === player.name)?.frontNet || ''}
+                  {producerFrontTotals.playerTotals.find(p => p.id === player.id)?.frontNet || '-'}
                 </div>
                 
+                {/* Back nine scores */}
                 {backNine.map((hole) => {
                   const playerKey = `${hole.number}-${player.name}`;
                   const scoreData = playerScores.get(playerKey)?.[0];
+                  const isBest = scoreData?.netScore !== null && 
+                    isBestNetScore(hole.number, player.id, scoreData?.netScore);
+                  
                   return (
                     <div 
-                      key={`score-${player.id}-${hole.number}`}
-                      className={`score-input-cell ${isLowestScore(hole.number, player.name, "producer") ? 'best-score' : ''}`}
+                      key={`back-${hole.number}-${player.id}`} 
+                      className={`score-input-cell ${isBest ? 'best-score' : ''}`}
                     >
                       <input
                         type="number"
-                        value={scoreData && scoreData.score !== null ? scoreData.score.toString() : ''}
-                        onChange={(e) =>
-                          handlePlayerScoreChange(
-                            hole.number,
-                            player.name,
-                            "producer",
-                            e.target.value,
-                            e.target
-                          )
-                        }
                         min="1"
-                        max="12"
-                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
+                        max="20"
+                        value={scoreData?.score !== null ? scoreData?.score : ''}
+                        disabled={locked || !canEditScores || isSubmitting}
+                        onChange={(e) => {
+                          const newValue = e.target.value 
+                            ? parseInt(e.target.value, 10) 
+                            : null;
+                          handleScoreChange(hole.number, player.id, newValue);
+                        }}
+                        onBlur={(e) => {
+                          const newValue = e.target.value
+                            ? parseInt(e.target.value, 10)
+                            : null;
+                          if (newValue !== null && (newValue < 1 || newValue > 20)) {
+                            e.target.value = '';
+                            handleScoreChange(hole.number, player.id, null);
+                          }
+                        }}
                       />
-                      {/* Net Score Display */}
-                      {scoreData && 
-                       scoreData.score !== null && 
-                       scoreData.handicapStrokes > 0 && (
-                        <span className="net-score">
-                          {scoreData.netScore}
-                          <span className="handicap-dot">•</span>
-                        </span>
+                      {scoreData?.handicapStrokes > 0 && (
+                        <span className="handicap-dot">•</span>
+                      )}
+                      {scoreData?.netScore !== null && (
+                        <span className="net-score">{scoreData.netScore}</span>
                       )}
                     </div>
                   );
                 })}
+                
+                {/* Back nine total */}
                 <div className="player-total">
-                  {producerFrontTotals.playerTotals.find(p => p.name === player.name)?.backNet || ''}
+                  {producerFrontTotals.playerTotals.find(p => p.id === player.id)?.backNet || '-'}
                 </div>
+                
+                {/* Overall total */}
                 <div className="player-total">
-                  {producerFrontTotals.playerTotals.find(p => p.name === player.name)?.netTotal || ''}
+                  {producerFrontTotals.playerTotals.find(p => p.id === player.id)?.totalNet || '-'}
                 </div>
               </React.Fragment>
             ))}
-          </div>
-        )}
-        
-        {/* Mobile version shows front and back nine separately */}
-        {isMobile && (
-          <div className="mobile-view">
-            <p>Mobile view is coming soon.</p>
-          </div>
+          </>
         )}
       </div>
     </div>
   );
-}
+};
+
+export default BestBallScorecard;
