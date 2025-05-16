@@ -53,7 +53,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication
   setupAuth(app);
-
+  
   // Initialize default bet types
   const initializeBetTypes = async () => {
     try {
@@ -85,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isActive: true,
         },
       ];
-
+      
       // For each default bet type, check if it exists and create if not
       for (const betType of defaultBetTypes) {
         const existingType = await storage.getBetTypeByName(betType.name);
@@ -98,10 +98,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error initializing bet types:", error);
     }
   };
-
+  
   // Call the initialization function when the server starts
   initializeBetTypes();
-
+  
   // Initialize the application data - can be called to repair data
   app.get("/api/initialize", async (req, res) => {
     try {
@@ -112,35 +112,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ success: false, message: "Failed to initialize application data" });
     }
   });
-
+  
   // Change password endpoint - requires authentication
   app.post('/api/change-password', isAuthenticated, async (req, res) => {
     try {
       const { newPassword } = req.body;
-
+      
       // Validate new password (must be 4 digits)
       if (!newPassword || !/^\d{4}$/.test(newPassword)) {
         return res.status(400).json({ message: "PIN must be exactly 4 digits" });
       }
-
+      
       // Get current user from session
       if (!req.user || !req.user.id) {
         return res.status(401).json({ message: "User not authenticated" });
       }
-
+      
       // Hash the new password
       const hashedPasscode = await hashPassword(newPassword);
-
+      
       // Update the user with new password and mark first login complete
       const updatedUser = await storage.updateUser(req.user.id, { 
         passcode: hashedPasscode,
         needsPasswordChange: false
       });
-
+      
       if (!updatedUser) {
         return res.status(500).json({ message: "Failed to update PIN" });
       }
-
+      
       return res.status(200).json({ message: "PIN updated successfully" });
     } catch (error) {
       console.error("Error changing PIN:", error);
@@ -199,7 +199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch courses" });
     }
   });
-
+  
   // API to add course (for testing)
   app.post("/api/courses", async (req, res) => {
     try {
@@ -314,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: "Failed to update round" });
     }
   });
-
+  
   app.delete("/api/rounds/:id", isAdmin, async (req, res) => {
     try {
       const roundId = parseInt(req.params.id);
@@ -326,13 +326,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Delete the round - this will cascade delete all related matches, scores and match participants
       await storage.deleteRound(roundId);
-
+      
       // Update tournament scores after round deletion
       const updatedTournament = await storage.getTournament();
       if (updatedTournament) {
         broadcast("tournament-updated", updatedTournament);
       }
-
+      
       return res.status(200).json({ message: "Round deleted successfully" });
     } catch (error) {
       console.error("Round deletion error:", error);
@@ -414,7 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: "Failed to update match" });
     }
   });
-
+  
   app.delete("/api/matches/:id", isAdmin, async (req, res) => {
     try {
       const matchId = parseInt(req.params.id);
@@ -464,7 +464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(scores);
     }
   });
-
+  
   // Player Scores API
   app.get("/api/player-scores", async (req, res) => {
     const matchId = req.query.matchId
@@ -519,7 +519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Broadcast player score update
       broadcast("player-score-updated", result);
-
+      
       res.json(result);
     } catch (error) {
       console.error("Error processing player score:", error);
@@ -535,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/player-scores/:id", async (req, res) => {
     try {
       const playerScoreId = parseInt(req.params.id);
-
+      
       // Validate player score data
       const schema = z.object({
         playerId: z.number().optional(),
@@ -548,14 +548,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update the player score
       const updatedPlayerScore = await storage.updatePlayerScore(playerScoreId, playerScoreData);
-
+      
       if (!updatedPlayerScore) {
         return res.status(404).json({ message: "Player score not found" });
       }
 
       // Broadcast player score update
       broadcast("player-score-updated", updatedPlayerScore);
-
+      
       // Return all player scores for this match to ensure frontend has all data
       const allPlayerScores = await storage.getPlayerScoresByMatch(updatedPlayerScore.matchId);
       res.json(allPlayerScores);
@@ -569,30 +569,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update player score" });
     }
   });
-
+  
   app.delete("/api/player-scores/:id", async (req, res) => {
     try {
       const playerScoreId = parseInt(req.params.id);
-
+      
       // Get the player score before deleting it to get the matchId for broadcasting
       const playerScore = await storage.getPlayerScoreById(playerScoreId);
-
+      
       if (!playerScore) {
         return res.status(404).json({ message: "Player score not found" });
       }
-
+      
       const matchId = playerScore.matchId;
-
+      
       // Delete the player score
       const result = await storage.deletePlayerScore(playerScoreId);
-
+      
       if (!result) {
         return res.status(500).json({ message: "Failed to delete player score" });
       }
-
+      
       // Broadcast that the player score was deleted
       broadcast("player-score-deleted", { id: playerScoreId, matchId });
-
+      
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting player score:", error);
@@ -725,7 +725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const courseId = req.query.courseId
       ? parseInt(req.query.courseId as string)
       : undefined;
-
+    
     if (courseId) {
       // Filter holes by courseId if provided
       const holes = await storage.getHolesByCourse(courseId);
@@ -767,7 +767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Since getPlayersByTeam doesn't exist in this version, we'll filter the players manually
     const allPlayers = await storage.getPlayers();
-
+    
     if (teamId) {
       const filteredPlayers = allPlayers.filter(player => player.teamId === teamId);
       res.json(filteredPlayers);
@@ -780,7 +780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Validate with our custom schema
       const playerData = insertPlayerSchema.parse(req.body);
-
+      
       // Create the player
       const player = await storage.createPlayer(playerData);
       broadcast("player-created", player);
@@ -813,32 +813,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: "Failed to update player" });
     }
   });
-
+  
   app.delete("/api/players/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const playerId = parseInt(req.params.id);
-
+      
       // Check if player exists
       const player = await storage.getPlayer(playerId);
       if (!player) {
         return res.status(404).json({ message: "Player not found" });
       }
-
+      
       // Delete player (which will cascade delete associated user)
       const result = await storage.deletePlayer(playerId);
-
+      
       // Notify clients of deletion
       if (result) {
         broadcast("player-deleted", { id: playerId });
       }
-
+      
       return res.status(200).json({ success: result });
     } catch (error) {
       console.error("Player deletion error:", error);
       return res.status(500).json({ message: "Failed to delete player" });
     }
   });
-
+  
   // Match Players API
   app.get("/api/match-players", async (req, res) => {
     const matchId = req.query.matchId
@@ -847,29 +847,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const roundId = req.query.roundId
       ? parseInt(req.query.roundId as string)
       : undefined;
-
+    
     if (!matchId && !roundId) {
       return res.status(400).json({ message: "Either matchId or roundId query parameter is required" });
     }
-
+    
     if (matchId) {
       const matchPlayers = await storage.getMatchParticipants(matchId);
       return res.json(matchPlayers);
     } else if (roundId) {
       // Get all matches in this round
       const matches = await storage.getMatchesByRound(roundId);
-
+      
       // Get players for each match
       const playersInRound = [];
       for (const match of matches) {
         const matchPlayers = await storage.getMatchParticipants(match.id);
         playersInRound.push(...matchPlayers);
       }
-
+      
       return res.json(playersInRound);
     }
   });
-
+  
   app.post("/api/match-players", async (req, res) => {
     try {
       const playerData = {
@@ -877,15 +877,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         playerId: req.body.playerId,
         team: req.body.team,
       };
-
+      
       const matchPlayer = await storage.createMatchParticipant(playerData);
-
+      
       // Get the updated match
       const match = await storage.getMatchWithParticipants(matchPlayer.matchId);
       if (match) {
         broadcast("match-updated", match);
       }
-
+      
       res.status(201).json(matchPlayer);
     } catch (error) {
       console.error("Match player creation error:", error);
@@ -898,10 +898,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const score = insertBestBallScoreSchema.parse(req.body);
       const result = await storage.saveBestBallScore(score);
-
+      
       // Broadcast the update
       broadcast("best-ball-score-updated", result[0]);
-
+      
       res.json(result[0]);
     } catch (error) {
       console.error('Error saving best ball score:', error);
@@ -931,17 +931,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const matchId = parseInt(req.params.matchId);
       const playerId = parseInt(req.params.playerId);
       const holeNumber = parseInt(req.params.holeNumber);
-
-      ```python
+      
       if (isNaN(matchId) || isNaN(playerId) || isNaN(holeNumber)) {
         return res.status(400).json({ error: 'Invalid parameters' });
       }
-
+      
       await storage.deleteBestBallScore(matchId, playerId, holeNumber);
-
+      
       // Broadcast the deletion
       broadcast("best-ball-score-deleted", { matchId, playerId, holeNumber });
-
+      
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting best ball score:', error);
@@ -1150,7 +1149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Validate with our custom schema
       const playerData = insertPlayerSchema.parse(req.body);
-
+      
       // Create the player
       const player = await storage.createPlayer(playerData);
       broadcast("player-created", player);
@@ -1165,13 +1164,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Internal server error" });
     }
   });
-
+  
   // Delete all players - Must come BEFORE the specific ID endpoint to avoid route conflicts
   app.delete("/api/admin/players/all", isAdmin, async (req, res) => {
     try {
       // Use the storage interface to delete all players
       const result = await storage.deleteAllPlayers();
-
+      
       if (result) {
         // Log success and broadcast
         console.log("Successfully deleted all players and associated users");
@@ -1193,21 +1192,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-
+  
   // Delete specific player by ID - Must come AFTER the "all" endpoint
   app.delete("/api/admin/players/:id", isAdmin, async (req, res) => {
     try {
       const playerId = parseInt(req.params.id);
-
+      
       // Check if player exists
       const player = await storage.getPlayer(playerId);
       if (!player) {
         return res.status(404).json({ error: "Player not found" });
       }
-
+      
       // Delete player with cascading delete of user
       const result = await storage.deletePlayer(playerId);
-
+      
       if (result) {
         broadcast("player-deleted", { id: playerId });
         return res.status(200).json({ success: true });
@@ -1227,7 +1226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Use new deleteAllRounds method that properly removes rounds from the database
       await storage.deleteAllRounds();
-
+      
       broadcast("data-reset", { type: "rounds-deleted" });
       res.status(200).json({ message: "All rounds have been deleted" });
     } catch (error) {
@@ -1235,27 +1234,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Failed to delete all rounds" });
     }
   });
-
+  
   // Delete a single round
   app.delete("/api/admin/rounds/:id", isAdmin, async (req, res) => {
     try {
       const roundId = parseInt(req.params.id);
       const round = await storage.getRound(roundId);
-
+      
       if (!round) {
         return res.status(404).json({ error: "Round not found" });
       }
-
+      
       // Use the new deleteRound method to fully remove the round from the database
       await storage.deleteRound(roundId);
-
+      
       // Recalculate tournament scores
       const tournamentScores = await storage.calculateTournamentScores();
       const tournament = await storage.getTournament();
       if (tournament) {
         await storage.updateTournament(tournament.id, tournamentScores);
       }
-
+      
       broadcast("round-deleted", { id: roundId });
       res.status(200).json({ message: "Round has been deleted" });
     } catch (error) {
@@ -1448,20 +1447,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const playerId = parseInt(req.params.id);
       const roundId = parseInt(req.body.roundId);
       const courseHandicap = parseInt(req.body.courseHandicap);
-
+      
       if (isNaN(playerId) || isNaN(roundId) || isNaN(courseHandicap)) {
         return res.status(400).json({ 
           error: "Invalid parameters. Require playerId, roundId, and courseHandicap."
         });
       }
-
+      
       // Store the course handicap
       const updatedHandicap = await storage.storePlayerCourseHandicap(
         playerId, 
         roundId, 
         courseHandicap
       );
-
+      
       res.json(updatedHandicap);
     } catch (error) {
       console.error("Error updating player course handicap:", error);
@@ -1474,11 +1473,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const courseId = parseInt(req.params.id);
       const { courseRating, slopeRating, par } = req.body;
-
+      
       if (isNaN(courseId) || isNaN(courseRating) || isNaN(slopeRating) || isNaN(par)) {
         return res.status(400).json({ error: "Invalid course ratings data" });
       }
-
+      
       const updatedCourse = await storage.updateCourseRatings(courseId, {
         courseRating,
         slopeRating,
@@ -1496,11 +1495,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const holeId = parseInt(req.params.id);
       const handicapRank = parseInt(req.body.handicapRank);
-
+      
       if (isNaN(holeId) || isNaN(handicapRank) || handicapRank < 1 || handicapRank > 18) {
         return res.status(400).json({ error: "Invalid hole handicap rank data" });
       }
-
+      
       const updatedHole = await storage.updateHoleHandicapRank(holeId, handicapRank);
       res.json(updatedHole);
     } catch (error) {
@@ -1514,11 +1513,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const roundId = parseInt(req.params.roundId);
       const playerId = parseInt(req.params.playerId);
-
+      
       if (isNaN(roundId) || isNaN(playerId)) {
         return res.status(400).json({ error: "Invalid roundId or playerId" });
       }
-
+      
       const handicap = await storage.getPlayerCourseHandicap(playerId, roundId);
       res.json(handicap);
     } catch (error) {
@@ -1526,22 +1525,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to get player course handicap" });
     }
   });
-
+  
   // Get all player handicaps for a specific round
   app.get("/api/round-handicaps/:roundId", async (req, res) => {
     try {
       const roundId = parseInt(req.params.roundId);
-
+      
       if (isNaN(roundId)) {
         return res.status(400).json({ error: "Invalid roundId" });
       }
-
+      
       // Get the round to find the course
       const round = await storage.getRound(roundId);
       if (!round) {
         return res.status(404).json({ error: "Round not found" });
       }
-
+      
       // Get all player handicaps for this round
       const handicaps = await storage.getAllPlayerCourseHandicaps(roundId);
       res.json(handicaps);
@@ -1557,11 +1556,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const roundId = parseInt(req.params.roundId);
       const playerId = parseInt(req.params.playerId);
       const holeNumber = parseInt(req.params.holeNumber);
-
+      
       if (isNaN(roundId) || isNaN(playerId) || isNaN(holeNumber)) {
         return res.status(400).json({ error: "Invalid parameters" });
       }
-
+      
       const strokes = await storage.getHoleHandicapStrokes(playerId, roundId, holeNumber);
       res.json({ strokes });
     } catch (error) {
@@ -1587,17 +1586,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tournament-history/:id", async (req, res) => {
     try {
       const tournamentId = parseInt(req.params.id);
-
+      
       if (isNaN(tournamentId)) {
         return res.status(400).json({ error: "Invalid tournament ID" });
       }
-
+      
       const tournamentHistory = await storage.getTournamentHistoryEntry(tournamentId);
-
+      
       if (!tournamentHistory) {
         return res.status(404).json({ error: "Tournament history not found" });
       }
-
+      
       res.json(tournamentHistory);
     } catch (error) {
       console.error("Error getting tournament history entry:", error);
@@ -1609,11 +1608,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tournament-player-stats/:tournamentId", async (req, res) => {
     try {
       const tournamentId = parseInt(req.params.tournamentId);
-
+      
       if (isNaN(tournamentId)) {
         return res.status(400).json({ error: "Invalid tournament ID" });
       }
-
+      
       const playerStats = await storage.getTournamentPlayerStats(tournamentId);
       res.json(playerStats);
     } catch (error) {
@@ -1627,17 +1626,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const playerId = parseInt(req.params.playerId);
       const tournamentId = parseInt(req.params.tournamentId);
-
+      
       if (isNaN(playerId) || isNaN(tournamentId)) {
         return res.status(400).json({ error: "Invalid player ID or tournament ID" });
       }
-
+      
       const stats = await storage.getPlayerTournamentStats(playerId, tournamentId);
-
+      
       if (!stats) {
         return res.status(404).json({ error: "Player tournament stats not found" });
       }
-
+      
       res.json(stats);
     } catch (error) {
       console.error("Error getting player tournament stats:", error);
@@ -1649,17 +1648,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/players/:playerId/career-stats", async (req, res) => {
     try {
       const playerId = parseInt(req.params.playerId);
-
+      
       if (isNaN(playerId)) {
         return res.status(400).json({ error: "Invalid player ID" });
       }
-
+      
       const careerStats = await storage.getPlayerCareerStats(playerId);
-
+      
       if (!careerStats) {
         return res.status(404).json({ error: "Player career stats not found" });
       }
-
+      
       res.json(careerStats);
     } catch (error) {
       console.error("Error getting player career stats:", error);
@@ -1671,11 +1670,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/players/:playerId/matchups", async (req, res) => {
     try {
       const playerId = parseInt(req.params.playerId);
-
+      
       if (isNaN(playerId)) {
         return res.status(400).json({ error: "Invalid player ID" });
       }
-
+      
       const matchups = await storage.getPlayerMatchups(playerId);
       res.json(matchups);
     } catch (error) {
@@ -1688,11 +1687,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/players/:playerId/match-type-stats", async (req, res) => {
     try {
       const playerId = parseInt(req.params.playerId);
-
+      
       if (isNaN(playerId)) {
         return res.status(400).json({ error: "Invalid player ID" });
       }
-
+      
       const matchTypeStats = await storage.getPlayerAllMatchTypeStats(playerId);
       res.json(matchTypeStats);
     } catch (error) {
@@ -1705,16 +1704,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/tournament-history/update", isAdmin, async (req, res) => {
     try {
       const tournament = await storage.getTournament();
-
+      
       if (!tournament) {
         return res.status(404).json({ error: "Tournament not found" });
       }
-
+      
       const updatedHistory = await storage.updateTournamentHistory(tournament.id);
-
+      
       // Also update all player stats
       await storage.calculateAndUpdateAllPlayerStats(tournament.id);
-
+      
       res.json(updatedHistory);
     } catch (error) {
       console.error("Error updating tournament history:", error);
@@ -1723,7 +1722,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sportsbook API endpoints
-
+  
   // Bet Types API
   app.get('/api/bet-types', async (req, res) => {
     try {
@@ -1750,14 +1749,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/bets', isAuthenticated, async (req, res) => {
     try {
       let bets;
-
+      
       // Admin can see all bets, users can only see their own
       if (req.user.isAdmin) {
         bets = await storage.getBets();
       } else {
         bets = await storage.getUserBets(req.user.id);
       }
-
+      
       res.json(bets);
     } catch (error) {
       console.error("Error getting bets:", error);
@@ -1799,10 +1798,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/bets', isAuthenticated, async (req, res) => {
     try {
+      // Ensure user is placing bet for themselves (unless admin)
       const data = {
-        ...req.body,
-        userId: req.user.id // Add the authenticated user's ID
+        ...insertBetSchema.parse(req.body),
+        userId: req.user.id, // Always use the authenticated user's ID
       };
+      
+      // Calculate potential payout based on odds
+      if (data.amount && data.odds) {
+        const amount = parseFloat(data.amount.toString());
+        const odds = parseFloat(data.odds.toString());
+        data.potentialPayout = (amount * odds).toString();
+      }
+      
       const result = await storage.createBet(data);
       res.json(result);
     } catch (error) {
@@ -1811,11 +1819,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/bets/:id/settle', isAuthenticated, isAdmin, async (req, res) =>{
+  app.post('/api/bets/:id/settle', isAuthenticated, isAdmin, async (req, res) => {
     try {
       const betId = parseInt(req.params.id);
       const { status, actualResult } = req.body;
-
+      
       // Only admins can settle bets
       const result = await storage.settleBet(betId, status, actualResult, req.user.id);
       res.json(result);
@@ -1833,7 +1841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...insertParlaySchema.parse(parlayData),
         userId: req.user.id, // Always use the authenticated user's ID
       };
-
+      
       const result = await storage.createParlay(data, betIds);
       res.json(result);
     } catch (error) {
@@ -1845,14 +1853,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/parlays', isAuthenticated, async (req, res) => {
     try {
       let parlays;
-
+      
       // Admin can see all parlays, users can only see their own
       if (req.user.isAdmin) {
         parlays = await storage.getParlays();
       } else {
         parlays = await storage.getUserParlays(req.user.id);
       }
-
+      
       res.json(parlays);
     } catch (error) {
       console.error("Error getting parlays:", error);
@@ -1864,14 +1872,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/ledger', isAuthenticated, async (req, res) => {
     try {
       let entries;
-
+      
       // Admin can see all ledger entries, users can only see their own
       if (req.user.isAdmin) {
         entries = await storage.getLedgerEntries();
       } else {
         entries = await storage.getUserLedgerEntries(req.user.id);
       }
-
+      
       res.json(entries);
     } catch (error) {
       console.error("Error getting ledger entries:", error);
