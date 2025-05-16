@@ -1724,13 +1724,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sportsbook API endpoints
   
   // Bet Types API
-  app.get('/api/bet-types', async (req, res) => {
+  app.get("/api/bet-types", async (req, res) => {
     try {
+      console.log("API: Fetching bet types");
       const betTypes = await storage.getBetTypes();
+      console.log("API: Bet types fetched:", betTypes);
       res.json(betTypes);
     } catch (error) {
-      console.error("Error getting bet types:", error);
-      res.status(500).json({ message: "Failed to get bet types" });
+      console.error("Error fetching bet types:", error);
+      res.status(500).json({ message: "Failed to fetch bet types" });
     }
   });
 

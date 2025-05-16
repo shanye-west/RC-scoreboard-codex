@@ -1727,6 +1727,42 @@ export class DBStorage implements IStorage {
         colorCode: "#800000", // Maroon
       });
     }
+
+    // Create default bet types if they don't exist
+    const existingBetTypes = await this.getBetTypes();
+    if (existingBetTypes.length === 0) {
+      const defaultBetTypes = [
+        {
+          name: 'match_winner',
+          description: 'Bet on which team wins a specific match',
+          isActive: true,
+        },
+        {
+          name: 'player_prop',
+          description: 'Bet on whether a specific player will win, tie, or lose their match',
+          isActive: true,
+        },
+        {
+          name: 'round_winner',
+          description: 'Bet on which team wins the most matches in a given round',
+          isActive: true,
+        },
+        {
+          name: 'over_under',
+          description: 'Bet on whether a statistic will be over or under a specified value',
+          isActive: true,
+        },
+        {
+          name: 'parlay',
+          description: 'Combine multiple bets for higher risk/reward',
+          isActive: true,
+        },
+      ];
+
+      for (const betType of defaultBetTypes) {
+        await this.createBetType(betType);
+      }
+    }
     
     // Ensure admin user exists
     await this.ensureAdminUserExists();
@@ -2061,7 +2097,13 @@ export class DBStorage implements IStorage {
 
   // Sportsbook methods - Bet Types
   async getBetTypes(): Promise<BetType[]> {
-    return db.select().from(bet_types);
+    try {
+      const result = await db.select().from(bet_types).where(eq(bet_types.isActive, true));
+      return result;
+    } catch (error) {
+      console.error("Error fetching bet types:", error);
+      throw error;
+    }
   }
 
   async getBetType(id: number): Promise<BetType | undefined> {
