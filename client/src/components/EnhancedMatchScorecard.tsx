@@ -788,7 +788,51 @@ const EnhancedMatchScorecard = ({
       
       return bestBallResponse.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // We'll maintain local state update for immediate feedback
+      // before the queries refetch
+      const player = [...aviatorPlayersList, ...producerPlayersList]
+        .find(p => p.id === data.playerId);
+        
+      if (player) {
+        const teamId = player.teamId === 1 ? "aviator" : "producer";
+        console.log(`Preserving handicap data after save: Player=${player.name}, Hole=${data.holeNumber}, Handicap=${data.handicapStrokes}`);
+        
+        // Update local state to ensure handicap strokes are preserved
+        setPlayerScores(prev => {
+          const newScores = new Map(prev);
+          const playerKey = `${data.holeNumber}-${player.name}`;
+          const teamKey = `${data.holeNumber}-${teamId}`;
+          
+          // Create player score object with handicap information
+          const playerScoreObj = {
+            player: player.name,
+            score: data.score,
+            teamId,
+            playerId: data.playerId,
+            handicapStrokes: data.handicapStrokes,
+            netScore: data.netScore
+          };
+          
+          // Update individual player score
+          newScores.set(playerKey, [playerScoreObj]);
+          
+          // Update team scores
+          const teamScores = newScores.get(teamKey) || [];
+          const playerIndex = teamScores.findIndex(s => s.playerId === data.playerId);
+          
+          if (playerIndex >= 0) {
+            teamScores[playerIndex] = playerScoreObj;
+          } else {
+            teamScores.push(playerScoreObj);
+          }
+          
+          newScores.set(teamKey, teamScores);
+          return newScores;
+        });
+      }
+      
+      // Now invalidate queries to fetch fresh data from server
       queryClient.invalidateQueries({ queryKey: [`/api/best-ball-scores/${matchId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/player-scores?matchId=${matchId}`] });
     },
