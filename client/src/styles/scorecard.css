@@ -1,0 +1,87 @@
+.scorecard-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.sticky-column {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: inherit;
+}
+
+.border-aviator {
+  border-color: #1a365d;
+}
+
+.border-producer {
+  border-color: #2d3748;
+}
+
+.bg-aviator {
+  background-color: #1a365d;
+}
+
+.bg-producer {
+  background-color: #2d3748;
+}
+
+.text-aviator {
+  color: #1a365d;
+}
+
+.text-producer {
+  color: #2d3748;
+}
+
+.score-input {
+  transition: all 0.2s;
+}
+
+.score-input:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2);
+}
+
+.score-input:disabled {
+  background-color: #f7fafc;
+  cursor: not-allowed;
+}
+
+.handicap-strokes {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: flex;
+  gap: 2px;
+}
+
+.handicap-indicator {
+  width: 4px;
+  height: 4px;
+  background-color: #4299e1;
+  border-radius: 50%;
+}
+
+.handicap-stroke {
+  background-color: #ebf8ff;
+}
+
+.net-score {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: #4a5568;
+}
+
+.score-display {
+  transition: all 0.2s;
+}
+
+.score-display.bg-aviator,
+.score-display.bg-producer {
+  font-weight: 600;
+} 

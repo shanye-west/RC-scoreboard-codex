@@ -1,17 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { toast } from 'react-hot-toast';
 import { Button } from './ui/button';
-import { Player, Hole, BestBallPlayerScore, MatchParticipant } from '../types';
+import { BestBallPlayerScore, BestBallHole, BestBallPlayer } from '../types/bestBall';
 
 interface BestBallScorecardProps {
   matchId: number;
   roundId: number;
-  holes: Hole[];
-  participants: MatchParticipant[];
-  allPlayers: Player[];
+  holes: BestBallHole[];
+  players: BestBallPlayer[];
   isAdmin: boolean;
 }
 
@@ -19,13 +18,11 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
   matchId,
   roundId,
   holes,
-  participants,
-  allPlayers,
+  players,
   isAdmin
 }) => {
   const queryClient = useQueryClient();
   const [playerScores, setPlayerScores] = useState<Map<string, BestBallPlayerScore[]>>(new Map());
-  const [handicapStrokes, setHandicapStrokes] = useState<Map<string, number>>(new Map());
 
   // Fetch player handicaps
   const { data: playerHandicaps = [] } = useQuery({
@@ -70,7 +67,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
 
   // Calculate handicap strokes for a player on a specific hole
   const calculateHandicapStrokes = (playerId: number, holeNumber: number): number => {
-    const player = allPlayers.find(p => p.id === playerId);
+    const player = players.find(p => p.id === playerId);
     if (!player?.handicapIndex) return 0;
 
     const hole = holes.find(h => h.number === holeNumber);
@@ -96,7 +93,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
     const newScores = new Map<string, BestBallPlayerScore[]>();
     existingScores.forEach((score: any) => {
       const key = `${score.hole_number}-${score.player_id}`;
-      const player = allPlayers.find(p => p.id === score.player_id);
+      const player = players.find(p => p.id === score.player_id);
       if (!player) return;
 
       newScores.set(key, [{
@@ -110,7 +107,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
     });
 
     setPlayerScores(newScores);
-  }, [existingScores, allPlayers]);
+  }, [existingScores, players]);
 
   // Handle score change
   const handleScoreChange = async (
@@ -118,7 +115,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
     playerId: number,
     value: string
   ) => {
-    const player = allPlayers.find(p => p.id === playerId);
+    const player = players.find(p => p.id === playerId);
     if (!player) return;
 
     let numValue: number | null = null;
@@ -163,49 +160,45 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
   };
 
   // Calculate team scores
-  const teamScores = useMemo(() => {
-    const scores = new Map<string, number>();
-    const aviatorScores = new Map<number, number>();
-    const producerScores = new Map<number, number>();
+  const teamScores = new Map<string, number>();
+  const aviatorScores = new Map<number, number>();
+  const producerScores = new Map<number, number>();
 
-    // Calculate best scores for each team on each hole
-    holes.forEach(hole => {
-      let aviatorBest = Infinity;
-      let producerBest = Infinity;
+  // Calculate best scores for each team on each hole
+  holes.forEach(hole => {
+    let aviatorBest = Infinity;
+    let producerBest = Infinity;
 
-      Array.from(playerScores.entries()).forEach(([key, scores]) => {
-        const [holeNum, playerId] = key.split('-');
-        if (parseInt(holeNum) !== hole.number) return;
+    Array.from(playerScores.entries()).forEach(([key, scores]) => {
+      const [holeNum, playerId] = key.split('-');
+      if (parseInt(holeNum) !== hole.number) return;
 
-        const player = allPlayers.find(p => p.id === parseInt(playerId));
-        if (!player) return;
+      const player = players.find(p => p.id === parseInt(playerId));
+      if (!player) return;
 
-        const score = scores[0]?.score;
-        if (score === null || score === undefined) return;
+      const score = scores[0]?.score;
+      if (score === null || score === undefined) return;
 
-        if (player.teamId === 1) {
-          aviatorBest = Math.min(aviatorBest, score);
-        } else {
-          producerBest = Math.min(producerBest, score);
-        }
-      });
-
-      if (aviatorBest !== Infinity) aviatorScores.set(hole.number, aviatorBest);
-      if (producerBest !== Infinity) producerScores.set(hole.number, producerBest);
+      if (player.teamId === 1) {
+        aviatorBest = Math.min(aviatorBest, score);
+      } else {
+        producerBest = Math.min(producerBest, score);
+      }
     });
 
-    // Calculate totals
-    let aviatorTotal = 0;
-    let producerTotal = 0;
+    if (aviatorBest !== Infinity) aviatorScores.set(hole.number, aviatorBest);
+    if (producerBest !== Infinity) producerScores.set(hole.number, producerBest);
+  });
 
-    aviatorScores.forEach(score => aviatorTotal += score);
-    producerScores.forEach(score => producerTotal += score);
+  // Calculate totals
+  let aviatorTotal = 0;
+  let producerTotal = 0;
 
-    scores.set('aviator', aviatorTotal);
-    scores.set('producer', producerTotal);
+  aviatorScores.forEach(score => aviatorTotal += score);
+  producerScores.forEach(score => producerTotal += score);
 
-    return scores;
-  }, [playerScores, holes, allPlayers]);
+  teamScores.set('aviator', aviatorTotal);
+  teamScores.set('producer', producerTotal);
 
   // Render the scorecard
   return (
@@ -240,69 +233,64 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
         </thead>
         <tbody>
           {/* Aviator Players */}
-          {participants
-            .filter(p => p.team === 'aviator')
-            .map(participant => {
-              const player = allPlayers.find(p => p.id === participant.playerId);
-              if (!player) return null;
-
-              return (
-                <tr key={player.id} className="border-b border-gray-200">
-                  <td className="py-2 px-2 sticky-column bg-white border-l-4 border-aviator">
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs font-medium text-black leading-tight">
-                        <div className="font-semibold">{player.name}</div>
-                        <div className="text-blue-600">
-                          HCP: {player.handicapIndex || 0}
-                        </div>
+          {players
+            .filter(p => p.teamId === 1)
+            .map(player => (
+              <tr key={player.id} className="border-b border-gray-200">
+                <td className="py-2 px-2 sticky-column bg-white border-l-4 border-aviator">
+                  <div className="flex justify-between items-center">
+                    <div className="text-xs font-medium text-black leading-tight">
+                      <div className="font-semibold">{player.name}</div>
+                      <div className="text-blue-600">
+                        HCP: {player.handicapIndex || 0}
                       </div>
                     </div>
-                  </td>
-                  {holes.map(hole => {
-                    const key = `${hole.number}-${player.id}`;
-                    const scores = playerScores.get(key);
-                    const score = scores?.[0]?.score;
-                    const strokes = scores?.[0]?.handicapStrokes || 0;
+                  </div>
+                </td>
+                {holes.map(hole => {
+                  const key = `${hole.number}-${player.id}`;
+                  const scores = playerScores.get(key);
+                  const score = scores?.[0]?.score;
+                  const strokes = scores?.[0]?.handicapStrokes || 0;
 
-                    return (
-                      <td key={hole.number} className="py-2 px-2 text-center">
-                        <div className="relative">
-                          {strokes > 0 && (
-                            <div className="handicap-strokes">
-                              {Array.from({ length: strokes }).map((_, i) => (
-                                <div key={i} className="handicap-indicator" />
-                              ))}
-                            </div>
-                          )}
-                          <input
-                            type="tel"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            className={`score-input w-8 h-8 text-center border border-gray-300 rounded
-                              ${strokes > 0 ? 'handicap-stroke' : ''}`}
-                            value={score?.toString() || ''}
-                            onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value)}
-                            min="1"
-                            max="12"
-                            disabled={!isAdmin}
-                          />
-                          {score !== null && strokes > 0 && (
-                            <span className="net-score">
-                              ({score - strokes})
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  })}
-                  <td className="py-2 px-2 text-center font-semibold bg-gray-100">
-                    {Array.from(playerScores.entries())
-                      .filter(([key]) => key.endsWith(`-${player.id}`))
-                      .reduce((sum, [_, scores]) => sum + (scores[0]?.score || 0), 0)}
-                  </td>
-                </tr>
-              );
-            })}
+                  return (
+                    <td key={hole.number} className="py-2 px-2 text-center">
+                      <div className="relative">
+                        {strokes > 0 && (
+                          <div className="handicap-strokes">
+                            {Array.from({ length: strokes }).map((_, i) => (
+                              <div key={i} className="handicap-indicator" />
+                            ))}
+                          </div>
+                        )}
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          className={`score-input w-8 h-8 text-center border border-gray-300 rounded
+                            ${strokes > 0 ? 'handicap-stroke' : ''}`}
+                          value={score?.toString() || ''}
+                          onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value)}
+                          min="1"
+                          max="12"
+                          disabled={!isAdmin}
+                        />
+                        {score !== null && strokes > 0 && (
+                          <span className="net-score">
+                            ({score - strokes})
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
+                <td className="py-2 px-2 text-center font-semibold bg-gray-100">
+                  {Array.from(playerScores.entries())
+                    .filter(([key]) => key.endsWith(`-${player.id}`))
+                    .reduce((sum, [_, scores]) => sum + (scores[0]?.score || 0), 0)}
+                </td>
+              </tr>
+            ))}
 
           {/* Aviator Team Total */}
           <tr className="border-b border-gray-200">
@@ -313,7 +301,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
               const aviatorScores = Array.from(playerScores.entries())
                 .filter(([key, scores]) => {
                   const [holeNum, playerId] = key.split('-');
-                  const player = allPlayers.find(p => p.id === parseInt(playerId));
+                  const player = players.find(p => p.id === parseInt(playerId));
                   return parseInt(holeNum) === hole.number && player?.teamId === 1;
                 })
                 .map(([_, scores]) => scores[0]?.score)
@@ -336,69 +324,64 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
           </tr>
 
           {/* Producer Players */}
-          {participants
-            .filter(p => p.team === 'producer')
-            .map(participant => {
-              const player = allPlayers.find(p => p.id === participant.playerId);
-              if (!player) return null;
-
-              return (
-                <tr key={player.id} className="border-b border-gray-200">
-                  <td className="py-2 px-2 sticky-column bg-white border-l-4 border-producer">
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs font-medium text-black leading-tight">
-                        <div className="font-semibold">{player.name}</div>
-                        <div className="text-blue-600">
-                          HCP: {player.handicapIndex || 0}
-                        </div>
+          {players
+            .filter(p => p.teamId === 2)
+            .map(player => (
+              <tr key={player.id} className="border-b border-gray-200">
+                <td className="py-2 px-2 sticky-column bg-white border-l-4 border-producer">
+                  <div className="flex justify-between items-center">
+                    <div className="text-xs font-medium text-black leading-tight">
+                      <div className="font-semibold">{player.name}</div>
+                      <div className="text-blue-600">
+                        HCP: {player.handicapIndex || 0}
                       </div>
                     </div>
-                  </td>
-                  {holes.map(hole => {
-                    const key = `${hole.number}-${player.id}`;
-                    const scores = playerScores.get(key);
-                    const score = scores?.[0]?.score;
-                    const strokes = scores?.[0]?.handicapStrokes || 0;
+                  </div>
+                </td>
+                {holes.map(hole => {
+                  const key = `${hole.number}-${player.id}`;
+                  const scores = playerScores.get(key);
+                  const score = scores?.[0]?.score;
+                  const strokes = scores?.[0]?.handicapStrokes || 0;
 
-                    return (
-                      <td key={hole.number} className="py-2 px-2 text-center">
-                        <div className="relative">
-                          {strokes > 0 && (
-                            <div className="handicap-strokes">
-                              {Array.from({ length: strokes }).map((_, i) => (
-                                <div key={i} className="handicap-indicator" />
-                              ))}
-                            </div>
-                          )}
-                          <input
-                            type="tel"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            className={`score-input w-8 h-8 text-center border border-gray-300 rounded
-                              ${strokes > 0 ? 'handicap-stroke' : ''}`}
-                            value={score?.toString() || ''}
-                            onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value)}
-                            min="1"
-                            max="12"
-                            disabled={!isAdmin}
-                          />
-                          {score !== null && strokes > 0 && (
-                            <span className="net-score">
-                              ({score - strokes})
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  })}
-                  <td className="py-2 px-2 text-center font-semibold bg-gray-100">
-                    {Array.from(playerScores.entries())
-                      .filter(([key]) => key.endsWith(`-${player.id}`))
-                      .reduce((sum, [_, scores]) => sum + (scores[0]?.score || 0), 0)}
-                  </td>
-                </tr>
-              );
-            })}
+                  return (
+                    <td key={hole.number} className="py-2 px-2 text-center">
+                      <div className="relative">
+                        {strokes > 0 && (
+                          <div className="handicap-strokes">
+                            {Array.from({ length: strokes }).map((_, i) => (
+                              <div key={i} className="handicap-indicator" />
+                            ))}
+                          </div>
+                        )}
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          className={`score-input w-8 h-8 text-center border border-gray-300 rounded
+                            ${strokes > 0 ? 'handicap-stroke' : ''}`}
+                          value={score?.toString() || ''}
+                          onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value)}
+                          min="1"
+                          max="12"
+                          disabled={!isAdmin}
+                        />
+                        {score !== null && strokes > 0 && (
+                          <span className="net-score">
+                            ({score - strokes})
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
+                <td className="py-2 px-2 text-center font-semibold bg-gray-100">
+                  {Array.from(playerScores.entries())
+                    .filter(([key]) => key.endsWith(`-${player.id}`))
+                    .reduce((sum, [_, scores]) => sum + (scores[0]?.score || 0), 0)}
+                </td>
+              </tr>
+            ))}
 
           {/* Producer Team Total */}
           <tr className="border-b border-gray-200">
@@ -409,7 +392,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
               const producerScores = Array.from(playerScores.entries())
                 .filter(([key, scores]) => {
                   const [holeNum, playerId] = key.split('-');
-                  const player = allPlayers.find(p => p.id === parseInt(playerId));
+                  const player = players.find(p => p.id === parseInt(playerId));
                   return parseInt(holeNum) === hole.number && player?.teamId === 2;
                 })
                 .map(([_, scores]) => scores[0]?.score)
