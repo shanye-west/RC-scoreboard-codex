@@ -949,15 +949,23 @@ const EnhancedMatchScorecard = ({
     },
   });
 
+  // Reference to track if we've already loaded scores to prevent infinite loops
+  const individualScoresLoaded = React.useRef(false);
+
   // Load individual scores into state when they're fetched
   useEffect(() => {
-    if (Array.isArray(individualScores) && individualScores.length > 0) {
+    // Only process scores if they exist and haven't been loaded yet
+    if (Array.isArray(individualScores) && individualScores.length > 0 && !individualScoresLoaded.current) {
       console.log("Loading scores from best_ball_player_scores table:", individualScores.length, "scores found");
+      
+      // Set flag to prevent infinite loops
+      individualScoresLoaded.current = true;
+      
       const newPlayerScores = new Map();
+      const allParticipants = [...aviatorPlayersList, ...producerPlayersList];
       
       individualScores.forEach(score => {
-        const player = [...aviatorPlayersList, ...producerPlayersList]
-          .find((p: Player) => p.id === score.playerId);
+        const player = allParticipants.find((p: Player) => p.id === score.playerId);
         
         if (player) {
           const teamKey = `${score.holeNumber}-${player.teamId === 1 ? 'aviator' : 'producer'}`;
@@ -974,7 +982,15 @@ const EnhancedMatchScorecard = ({
           
           // Update team scores
           const teamScores = newPlayerScores.get(teamKey) || [];
-          teamScores.push(scoreObj);
+          
+          // Check if player already exists in team scores
+          const existingIndex = teamScores.findIndex(s => s.playerId === score.playerId);
+          if (existingIndex >= 0) {
+            teamScores[existingIndex] = scoreObj;
+          } else {
+            teamScores.push(scoreObj);
+          }
+          
           newPlayerScores.set(teamKey, teamScores);
           
           // Update player-specific scores
@@ -987,7 +1003,7 @@ const EnhancedMatchScorecard = ({
         setPlayerScores(newPlayerScores);
       }
     }
-  }, [individualScores, aviatorPlayersList, producerPlayersList]);
+  }, [individualScores]);
   
   // Fix for: Type 'MapIterator<[string, BestBallPlayerScore[]]>' can only be iterated through
   const updateBestBallScores = (
