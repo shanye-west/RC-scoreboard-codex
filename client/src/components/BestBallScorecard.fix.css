@@ -1,0 +1,74 @@
+.sticky-column {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: white;
+}
+
+.scorecard-table {
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.scorecard-container {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.handicap-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: red;
+  margin-right: 2px;
+}
+
+.handicap-strokes {
+  position: absolute;
+  top: -4px;
+  right: -2px;
+  display: flex;
+}
+
+.handicap-indicator {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: red;
+  margin-left: 2px;
+}
+
+.scorecard-cell {
+  position: relative;
+}
+
+.net-score {
+  font-size: 0.7rem;
+  color: #666;
+  position: absolute;
+  bottom: -10px;
+  right: 2px;
+}
+
+.non-counting-score {
+  opacity: 0.5;
+}
+
+.score-input.handicap-stroke {
+  border-color: #ef4444;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .score-input {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 11px !important;
+  }
+  
+  .scorecard-table th, 
+  .scorecard-table td {
+    padding: 4px !important;
+  }
+}

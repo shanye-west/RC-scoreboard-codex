@@ -1110,17 +1110,7 @@ const EnhancedMatchScorecard = ({
       return;
     }
     
-    // Always process fallback scores regardless of session storage state
-    console.log("Processing fallback scores from player_scores table...");
-    
     console.log("Fallback: Loading scores from player_scores table:", existingPlayerScores.length, "scores found");
-    
-    // Only update if playerScores hasn't been populated through other methods
-    if (playerScores.size > 0) {
-      console.log("Player scores already loaded, skipping fallback...");
-      sessionStorage.setItem(fallbackKey, 'true');
-      return;
-    }
     
     // Apply fallback scores as a single state update
     setPlayerScores(prevScores => {
