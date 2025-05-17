@@ -1,0 +1,170 @@
+/* Adapting the BestBallScorecard styles to match EnhancedMatchScorecard */
+.best-ball-scorecard-container {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+}
+
+.scorecard-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 130px 40px repeat(9, minmax(32px, 1fr)) 50px repeat(9, minmax(32px, 1fr)) 50px 50px;
+  grid-auto-rows: 36px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  overflow: hidden;
+  background-color: hsl(var(--background));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.scorecard-grid > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+  font-size: 0.9rem;
+}
+
+/* Headers */
+.header-row {
+  font-weight: 600;
+  background-color: hsl(var(--muted));
+}
+
+.player-header, .handicap-header, .hole-number, .total-header {
+  font-weight: 600;
+  background-color: hsl(var(--muted));
+}
+
+/* Par and Handicap rows */
+.par-row, .handicap-row {
+  background-color: hsl(var(--muted));
+}
+
+.par-label, .handicap-label {
+  text-align: left;
+  padding-left: 10px;
+  font-weight: 600;
+}
+
+.par-value, .handicap-value {
+  font-weight: 500;
+}
+
+.empty {
+  background-color: hsl(var(--muted));
+}
+
+/* Team headers */
+.team-header {
+  grid-column: 1;
+  font-weight: 600;
+  text-align: left;
+  padding-left: 10px;
+}
+
+.team-header.aviators {
+  background-color: var(--aviator-bg);
+  color: var(--aviator-text);
+}
+
+.team-header.producers {
+  background-color: var(--producer-bg);
+  color: var(--producer-text);
+}
+
+/* Player rows */
+.player-name {
+  text-align: left;
+  padding-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-name.aviator {
+  color: var(--aviator-text);
+  border-left: 4px solid var(--aviator-accent);
+}
+
+.player-name.producer {
+  color: var(--producer-text);
+  border-left: 4px solid var(--producer-accent);
+}
+
+.player-handicap {
+  font-weight: 500;
+}
+
+/* Score cells */
+.score-input-cell {
+  position: relative;
+  padding: 2px;
+}
+
+.score-input-cell input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  text-align: center;
+  font-size: 14px;
+  background: transparent;
+  outline: none;
+}
+
+.score-input-cell.best-score {
+  background-color: rgba(var(--success-rgb), 0.1);
+}
+
+/* Net score display */
+.net-score {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 9px;
+  color: hsl(var(--muted-foreground));
+}
+
+.handicap-dot {
+  color: hsl(var(--destructive));
+  font-size: 12px;
+  margin-left: 1px;
+}
+
+/* Total cells */
+.player-total, .team-total {
+  font-weight: 600;
+  background-color: hsl(var(--muted));
+}
+
+.team-total {
+  background-color: hsl(var(--accent));
+}
+
+/* Add these variables to match your project theme */
+:root {
+  --aviator-bg: #dbeafe;
+  --aviator-text: #1e3a8a;
+  --aviator-accent: #3b82f6;
+  
+  --producer-bg: #fee2e2;
+  --producer-text: #7f1d1d;
+  --producer-accent: #ef4444;
+  
+  --success-rgb: 74, 222, 128;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .scorecard-grid {
+    font-size: 12px;
+    grid-template-columns: 100px 30px repeat(9, 30px) 40px repeat(9, 30px) 40px 40px;
+  }
+
+  .player-name {
+    font-size: 12px;
+    padding-left: 5px;
+  }
+}

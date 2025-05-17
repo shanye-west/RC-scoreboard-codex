@@ -4,7 +4,6 @@ import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import MatchHeader from "@/components/MatchHeader";
 import EnhancedMatchScorecard from "@/components/EnhancedMatchScorecard";
-import BestBallScorecard from "@/components/BestBallScorecard";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Edit, Save, Lock, Unlock } from "lucide-react";
@@ -331,23 +330,6 @@ const Match = ({ id }: { id: number }) => {
     }
   }, [scores, match]);
 
-  // Handle best ball score update
-  const handleBestBallScoreUpdate = (
-    holeNumber: number,
-    playerScores: Array<{
-      player: string;
-      score: number | null;
-      teamId: string;
-      playerId: number;
-      handicapStrokes?: number;
-      netScore?: number | null;
-    }>,
-  ) => {
-    // This function is handled internally by the EnhancedMatchScorecard component
-    console.log(`Best Ball scores updated for hole ${holeNumber}:`, playerScores);
-    // The component will update the match scores automatically based on these player scores
-  };
-
   // Handle score update
   const handleScoreUpdate = (
     holeNumber: number,
@@ -594,12 +576,10 @@ const Match = ({ id }: { id: number }) => {
             holes={holes || []}
             scores={scores || []}
             onScoreUpdate={handleScoreUpdate}
-            onBestBallScoreUpdate={handleBestBallScoreUpdate}
             matchStatus={match.status}
             matchType={round?.matchType || ""}
             locked={isLocked}
             participants={participants}
-            players={players}
           />
         </>
       )}
