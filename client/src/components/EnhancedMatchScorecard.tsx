@@ -374,8 +374,8 @@ const EnhancedMatchScorecard = ({
     if (isBestBall && playerHandicaps.length > 0 && holes.length > 0) {
       // Check if we've already processed handicaps for this match
       const handicapProcessedKey = `handicaps-processed-${matchId}`;
-      if (sessionStorage.getItem(handicapProcessedKey) === 'true' && playerScores.size > 0) {
-        return; // Skip processing if already done and we have data
+      if (playerScores.size > 0) {
+        return; // Skip processing if we already have data
       }
       
       const allPlayers = [...aviatorPlayersList, ...producerPlayersList];
@@ -480,8 +480,8 @@ const EnhancedMatchScorecard = ({
           }
         }
         
-        // Mark as processed to avoid redundant processing
-        sessionStorage.setItem(handicapProcessedKey, 'true');
+        // Don't mark as processed, let it recalculate on refresh
+        console.log("Handicap strokes calculated");
       }
     }
   }, [isBestBall, playerHandicaps, holes, aviatorPlayersList, producerPlayersList, getPlayerCourseHandicap, matchId]);
@@ -565,14 +565,8 @@ const EnhancedMatchScorecard = ({
       return;
     }
     
-    // Track if we've already initialized handicaps to prevent duplicate processing
-    const handicapKey = `handicaps-${matchId}`;
-    const handicapsInitialized = sessionStorage.getItem(handicapKey);
-    
-    if (handicapsInitialized === 'true') {
-      console.log("Handicaps already initialized, skipping...");
-      return;
-    }
+    // Always initialize handicaps on refresh
+    console.log("Starting handicap initialization...");
     
     console.log("Starting handicap loading for all players...");
     
@@ -667,9 +661,9 @@ const EnhancedMatchScorecard = ({
         });
       }
       
-      // Mark handicaps as initialized
-      sessionStorage.setItem(handicapKey, 'true');
-      console.log("Handicap loading complete and marked as initialized");
+      // Don't mark as initialized with sessionStorage to ensure recalculation on refresh
+      const handicapKey = `handicaps-${matchId}`;
+      console.log("Handicap loading complete");
     };
     
     // Start the batch update process
@@ -1189,9 +1183,9 @@ const EnhancedMatchScorecard = ({
         }
       }
       
-      // Mark as processed
-      sessionStorage.setItem(fallbackKey, 'true');
-      console.log("Fallback scores loaded and marked as processed");
+      // Don't mark as processed, let it reload on refresh
+      const fallbackKey = `fallback-${matchId}`;
+      console.log("Fallback scores loaded");
       
       return newPlayerScores;
     });
