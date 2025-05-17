@@ -947,7 +947,7 @@ const EnhancedMatchScorecard = ({
     holeNumber: number,
     currentScores: Map<string, BestBallPlayerScore[]>,
   ) => {
-    if (!isBestBall || !onBestBallScoreUpdate) return;
+    if (!isBestBall) return;
     
     // Get all player scores for this hole
     const playerScoresForHole: BestBallPlayerScore[] = [];
@@ -958,7 +958,7 @@ const EnhancedMatchScorecard = ({
     
     // Extract individual player scores from the map for this hole
     for (const [key, scores] of currentScores.entries()) {
-      // Only process individual player scores for this hole
+      // Only process individual player scores for this hole (not team collections)
       if (key.startsWith(`${holeNumber}-`) && !key.includes("-aviator") && !key.includes("-producer")) {
         if (scores && scores.length > 0) {
           const playerScore = scores[0];
@@ -969,14 +969,16 @@ const EnhancedMatchScorecard = ({
             continue;
           }
           
-          // Ensure handicapStrokes and netScore are set
+          // Ensure handicapStrokes is set
           if (playerScore.handicapStrokes === undefined) {
             playerScore.handicapStrokes = 0;
           }
           
-          // Calculate net score if missing
-          if (playerScore.netScore === undefined && playerScore.score !== null) {
-            playerScore.netScore = Math.max(0, playerScore.score - playerScore.handicapStrokes);
+          // Calculate net score if score exists
+          if (playerScore.score !== null) {
+            playerScore.netScore = Math.max(0, playerScore.score - (playerScore.handicapStrokes || 0));
+          } else {
+            playerScore.netScore = null;
           }
           
           // Add to the appropriate team's scores
@@ -997,6 +999,10 @@ const EnhancedMatchScorecard = ({
     let aviatorTeamScore: number | null = null;
     let producerTeamScore: number | null = null;
     
+    // Set all isBestBall flags to false initially
+    aviatorScores.forEach(s => { s.isBestBall = false; });
+    producerScores.forEach(s => { s.isBestBall = false; });
+    
     // Find lowest net score for Aviators
     if (aviatorScores.length > 0) {
       // Filter out null scores first
@@ -1008,9 +1014,10 @@ const EnhancedMatchScorecard = ({
         aviatorTeamScore = lowestScore.netScore;
         
         // Mark this as the team's best score
-        aviatorScores.forEach(s => {
-          s.isBestBall = s.playerId === lowestScore.playerId;
-        });
+        const lowestScorePlayer = aviatorScores.find(s => s.playerId === lowestScore.playerId);
+        if (lowestScorePlayer) {
+          lowestScorePlayer.isBestBall = true;
+        }
       }
     }
     
@@ -1025,13 +1032,36 @@ const EnhancedMatchScorecard = ({
         producerTeamScore = lowestScore.netScore;
         
         // Mark this as the team's best score
-        producerScores.forEach(s => {
-          s.isBestBall = s.playerId === lowestScore.playerId;
-        });
+        const lowestScorePlayer = producerScores.find(s => s.playerId === lowestScore.playerId);
+        if (lowestScorePlayer) {
+          lowestScorePlayer.isBestBall = true;
+        }
       }
     }
     
-    // Create score object to pass to Match.tsx
+    // Now update the main scores map with the updated player scores
+    setPlayerScores(prev => {
+      const newMap = new Map(prev);
+      
+      // Store team collections too so we can access all team players easily
+      if (aviatorScores.length > 0) {
+        newMap.set(`${holeNumber}-aviator`, aviatorScores);
+      }
+      
+      if (producerScores.length > 0) {
+        newMap.set(`${holeNumber}-producer`, producerScores);
+      }
+      
+      // Update individual player records
+      [...aviatorScores, ...producerScores].forEach(score => {
+        const playerKey = `${holeNumber}-${score.player}`;
+        newMap.set(playerKey, [score]);
+      });
+      
+      return newMap;
+    });
+    
+    // Create score object for the match scorecard
     const scoreData = {
       holeNumber,
       aviatorScore: aviatorTeamScore,
@@ -1040,29 +1070,12 @@ const EnhancedMatchScorecard = ({
     
     console.log(`Hole ${holeNumber} team scores:`, scoreData);
     
-    // Now update the main scores map with the team scores
-    // This ensures the UI can highlight the best ball scores
-    setPlayerScores(prev => {
-      const newMap = new Map(prev);
-      
-      // Update Aviator scores
-      aviatorScores.forEach(score => {
-        const playerKey = `${holeNumber}-${score.player}`;
-        newMap.set(playerKey, [score]);
-      });
-      
-      // Update Producer scores  
-      producerScores.forEach(score => {
-        const playerKey = `${holeNumber}-${score.player}`;
-        newMap.set(playerKey, [score]);
-      });
-      
-      return newMap;
-    });
-    
-    // Update the match scores
-    if (playerScoresForHole.length > 0) {
+    // Update the match scores if callback is provided
+    if (onBestBallScoreUpdate && playerScoresForHole.length > 0) {
       onBestBallScoreUpdate(holeNumber, playerScoresForHole);
+    } else {
+      // If no callback, directly update the score
+      handleScoreUpdate(holeNumber, aviatorTeamScore, producerTeamScore);
     }
   };
 
