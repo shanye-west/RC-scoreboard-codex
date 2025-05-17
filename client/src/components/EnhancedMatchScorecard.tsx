@@ -1187,23 +1187,10 @@ const EnhancedMatchScorecard = ({
       return;
     }
     
-    // Check if we've already processed this fallback
-    const fallbackKey = `fallback-scores-${matchId}`;
-    const fallbackProcessed = sessionStorage.getItem(fallbackKey);
+    console.log("Loading scores from player_scores table:", existingPlayerScores.length, "scores found");
     
-    if (fallbackProcessed === 'true') {
-      console.log("Fallback already processed, skipping...");
-      return;
-    }
-    
-    console.log("Fallback: Loading scores from player_scores table:", existingPlayerScores.length, "scores found");
-    
-    // Only update if playerScores hasn't been populated through other methods
-    if (playerScores.size > 0) {
-      console.log("Player scores already loaded, skipping fallback...");
-      sessionStorage.setItem(fallbackKey, 'true');
-      return;
-    }
+    // Create a flag to track if we found new scores to add
+    let foundNewScores = false;
     
     // Apply fallback scores as a single state update
     setPlayerScores(prevScores => {
@@ -1282,9 +1269,7 @@ const EnhancedMatchScorecard = ({
         }
       }
       
-      // Mark as processed
-      sessionStorage.setItem(fallbackKey, 'true');
-      console.log("Fallback scores loaded and marked as processed");
+      console.log("Player scores loading complete");
       
       return newPlayerScores;
     });
