@@ -1073,9 +1073,9 @@ const EnhancedMatchScorecard = ({
     // Update the match scores if callback is provided
     if (onBestBallScoreUpdate && playerScoresForHole.length > 0) {
       onBestBallScoreUpdate(holeNumber, playerScoresForHole);
-    } else {
-      // If no callback, directly update the score
-      handleScoreUpdate(holeNumber, aviatorTeamScore, producerTeamScore);
+    } else if (onScoreUpdate) {
+      // If no best ball callback but we have the regular score callback
+      onScoreUpdate(holeNumber, aviatorTeamScore, producerTeamScore);
     }
   };
 
@@ -1332,7 +1332,7 @@ const EnhancedMatchScorecard = ({
     // First check if the player has been explicitly marked as the best ball
     const playerKey = `${holeNumber}-${playerName}`;
     const playerScoreData = playerScores.get(playerKey) || [];
-    if (playerScoreData.length > 0 && playerScoreData[0].isBestBall) {
+    if (playerScoreData.length > 0 && playerScoreData[0].isBestBall === true) {
       return true;
     }
 
@@ -1371,15 +1371,16 @@ const EnhancedMatchScorecard = ({
       return aNetScore - bNetScore;
     });
     
-    // Current player's net score
+    // Calculate current player's net score
     const currentPlayerNetScore = currentPlayerScoreObj.netScore !== undefined && currentPlayerScoreObj.netScore !== null
       ? currentPlayerScoreObj.netScore
       : (currentPlayerScoreObj.score - (currentPlayerScoreObj.handicapStrokes || 0));
       
     // Find the lowest net score in the team 
-    let lowestNetScore = sortedScores[0].netScore !== undefined && sortedScores[0].netScore !== null
-      ? sortedScores[0].netScore
-      : (sortedScores[0].score! - (sortedScores[0].handicapStrokes || 0));
+    const lowestScorePlayer = sortedScores[0];
+    const lowestNetScore = lowestScorePlayer.netScore !== undefined && lowestScorePlayer.netScore !== null
+      ? lowestScorePlayer.netScore
+      : (lowestScorePlayer.score! - (lowestScorePlayer.handicapStrokes || 0));
     
     // If this player's net score equals the lowest, they're a best ball
     return currentPlayerNetScore === lowestNetScore;
@@ -1605,13 +1606,16 @@ const EnhancedMatchScorecard = ({
                         <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
                           <div className="relative">
                             {/* Handicap Strokes Indicators - Always show if available */}
-                            {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
-                              <div className="handicap-strokes">
-                                {Array.from({ length: playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0 }).map((_, i) => (
-                                  <div key={i} className="handicap-indicator"></div>
-                                ))}
-                              </div>
-                            )}
+                            {(() => {
+                              const handicapStrokes = playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes;
+                              return handicapStrokes && handicapStrokes > 0 ? (
+                                <div className="handicap-strokes">
+                                  {Array.from({ length: handicapStrokes }).map((_, i) => (
+                                    <div key={i} className="handicap-indicator"></div>
+                                  ))}
+                                </div>
+                              ) : null;
+                            })()}
                             <input
                               type="tel"
                               inputMode="numeric"
