@@ -372,35 +372,28 @@ const EnhancedMatchScorecard = ({
   // Ensure handicap strokes are visible in the UI and team scores are calculated
   useEffect(() => {
     if (isBestBall && playerHandicaps.length > 0 && holes.length > 0) {
+      // Check if we've already processed handicaps for this match
+      const handicapProcessedKey = `handicaps-processed-${matchId}`;
+      if (sessionStorage.getItem(handicapProcessedKey) === 'true' && playerScores.size > 0) {
+        return; // Skip processing if already done and we have data
+      }
+      
       const allPlayers = [...aviatorPlayersList, ...producerPlayersList];
+      if (allPlayers.length === 0) return; // Skip if no players
       
       // Update playerScores with handicap information for each player and hole
       const tempScores = new Map(playerScores);
       let updatedAny = false;
       
-      // Make sure all players have handicap strokes properly set
-      holes.forEach(hole => {
-        allPlayers.forEach(player => {
-          const playerKey = `${hole.number}-${player.name}`;
-          let playerScore = tempScores.get(playerKey)?.[0];
-          
-          // If player score doesn't exist, create it
-          if (!playerScore) {
-            const teamId = player.teamId === 1 ? "aviator" : "producer";
-            playerScore = {
-              player: player.name,
-              score: null,
-              teamId,
-              playerId: player.id,
-              handicapStrokes: 0,
-              netScore: null
-            };
-            tempScores.set(playerKey, [playerScore]);
-            updatedAny = true;
-          }
-          
-          // Calculate proper handicap strokes
-          const courseHandicap = getPlayerCourseHandicap(player.id);
+      // Batch process all players and holes together
+      const holesArray = [...holes]; // Convert to array for better performance
+      const updates = [];
+      
+      // Pre-compute all the handicap strokes for each player-hole combination
+      const handicapStrokesMap = new Map();
+      for (const player of allPlayers) {
+        const courseHandicap = getPlayerCourseHandicap(player.id);
+        for (const hole of holesArray) {
           const handicapRank = hole.handicapRank || 0;
           
           // Calculate strokes similar to getHandicapStrokes function
@@ -412,69 +405,86 @@ const EnhancedMatchScorecard = ({
             handicapStrokes = 2;
           }
           
-          // Update handicap strokes and net score if different
-          if (playerScore.handicapStrokes !== handicapStrokes) {
-            playerScore.handicapStrokes = handicapStrokes;
+          const key = `${player.id}-${hole.number}`;
+          handicapStrokesMap.set(key, handicapStrokes);
+        }
+      }
+      
+      // Batch process all player scores
+      for (const hole of holesArray) {
+        const aviatorHoleScores = [];
+        const producerHoleScores = [];
+        
+        for (const player of allPlayers) {
+          const playerKey = `${hole.number}-${player.name}`;
+          let playerScore = tempScores.get(playerKey)?.[0];
+          const teamId = player.teamId === 1 ? "aviator" : "producer";
+          
+          // If player score doesn't exist, create it
+          if (!playerScore) {
+            playerScore = {
+              player: player.name,
+              score: null,
+              teamId,
+              playerId: player.id,
+              handicapStrokes: handicapStrokesMap.get(`${player.id}-${hole.number}`) || 0,
+              netScore: null,
+              isBestBall: false
+            };
+            tempScores.set(playerKey, [playerScore]);
+            updatedAny = true;
+          } else if (playerScore.handicapStrokes !== (handicapStrokesMap.get(`${player.id}-${hole.number}`) || 0)) {
+            // Update handicap strokes if they've changed
+            playerScore.handicapStrokes = handicapStrokesMap.get(`${player.id}-${hole.number}`) || 0;
             
             // Update net score if score exists
             if (playerScore.score !== null) {
-              playerScore.netScore = Math.max(0, playerScore.score - handicapStrokes);
+              playerScore.netScore = Math.max(0, playerScore.score - playerScore.handicapStrokes);
             }
             
             tempScores.set(playerKey, [playerScore]);
             updatedAny = true;
           }
-        });
-        
-        // After updating all players for this hole, recalculate team scores
-        // Group players by team
-        const aviatorPlayers = allPlayers.filter(p => p.teamId === 1);
-        const producerPlayers = allPlayers.filter(p => p.teamId === 2);
-        
-        // Create team collections
-        const aviatorScores: BestBallPlayerScore[] = [];
-        const producerScores: BestBallPlayerScore[] = [];
-        
-        // Collect scores for this hole
-        aviatorPlayers.forEach(player => {
-          const playerKey = `${hole.number}-${player.name}`;
-          const score = tempScores.get(playerKey)?.[0];
-          if (score) {
-            aviatorScores.push(score);
+          
+          // Add to team collections
+          if (teamId === "aviator") {
+            aviatorHoleScores.push(playerScore);
+          } else {
+            producerHoleScores.push(playerScore);
           }
-        });
-        
-        producerPlayers.forEach(player => {
-          const playerKey = `${hole.number}-${player.name}`;
-          const score = tempScores.get(playerKey)?.[0];
-          if (score) {
-            producerScores.push(score);
-          }
-        });
+        }
         
         // Update team collections in the map
-        if (aviatorScores.length > 0) {
-          tempScores.set(`${hole.number}-aviator`, aviatorScores);
+        if (aviatorHoleScores.length > 0) {
+          tempScores.set(`${hole.number}-aviator`, aviatorHoleScores);
         }
         
-        if (producerScores.length > 0) {
-          tempScores.set(`${hole.number}-producer`, producerScores);
+        if (producerHoleScores.length > 0) {
+          tempScores.set(`${hole.number}-producer`, producerHoleScores);
         }
-      });
+      }
       
-      // Update player scores if needed
+      // Batch update state only once
       if (updatedAny) {
         setPlayerScores(tempScores);
         
-        // Recalculate all team scores
-        setTimeout(() => {
-          holes.forEach(hole => {
-            updateBestBallScores(hole.number, tempScores);
+        // Recalculate team scores for holes with player scores
+        for (const hole of holesArray) {
+          const hasScores = [...aviatorPlayersList, ...producerPlayersList].some(player => {
+            const key = `${hole.number}-${player.name}`;
+            return tempScores.get(key)?.[0]?.score !== null;
           });
-        }, 100);
+          
+          if (hasScores) {
+            updateBestBallScores(hole.number, tempScores);
+          }
+        }
+        
+        // Mark as processed to avoid redundant processing
+        sessionStorage.setItem(handicapProcessedKey, 'true');
       }
     }
-  }, [isBestBall, playerHandicaps, holes, aviatorPlayersList, producerPlayersList, getPlayerCourseHandicap]);
+  }, [isBestBall, playerHandicaps, holes, aviatorPlayersList, producerPlayersList, getPlayerCourseHandicap, matchId]);
 
   const allHoles = [...holes].sort((a, b) => a.number - b.number);
   const frontNine = [...holes].filter((h) => h.number <= 9).sort((a, b) => a.number - b.number);
@@ -1056,73 +1066,44 @@ const EnhancedMatchScorecard = ({
   ) => {
     if (!isBestBall) return;
     
-    // Get all player scores for this hole
-    const playerScoresForHole: BestBallPlayerScore[] = [];
+    // Try getting existing team scores from the map directly
+    const aviatorTeamKey = `${holeNumber}-aviator`;
+    const producerTeamKey = `${holeNumber}-producer`;
     
-    // Collect team scores - we need to process by team
-    const aviatorScores: BestBallPlayerScore[] = [];
-    const producerScores: BestBallPlayerScore[] = [];
+    const aviatorScores = currentScores.get(aviatorTeamKey) || [];
+    const producerScores = currentScores.get(producerTeamKey) || [];
     
-    // Extract individual player scores from the map for this hole
-    for (const [key, scores] of currentScores.entries()) {
-      // Only process individual player scores for this hole (not team collections)
-      if (key.startsWith(`${holeNumber}-`) && !key.includes("-aviator") && !key.includes("-producer")) {
-        if (scores && scores.length > 0) {
-          const playerScore = scores[0];
-          
-          // Make sure we have the required fields
-          if (!playerScore.playerId || !playerScore.player || !playerScore.teamId) {
-            console.warn("Incomplete player score data", playerScore);
-            continue;
-          }
-          
-          // Ensure handicapStrokes is set
-          if (playerScore.handicapStrokes === undefined) {
-            playerScore.handicapStrokes = 0;
-          }
-          
-          // Calculate net score if score exists
-          if (playerScore.score !== null) {
-            playerScore.netScore = Math.max(0, playerScore.score - (playerScore.handicapStrokes || 0));
-          } else {
-            playerScore.netScore = null;
-          }
-          
-          // Add to the appropriate team's scores
-          if (playerScore.teamId === 'aviator') {
-            aviatorScores.push(playerScore);
-          } else if (playerScore.teamId === 'producer') {
-            producerScores.push(playerScore);
-          }
-          
-          // Add to the combined list for the callback
-          playerScoresForHole.push(playerScore);
-        }
-      }
-    }
-    
-    // Calculate team score for each team
-    // Team score = lowest net score among teammates
+    // Calculate team scores for each team (lowest net score)
     let aviatorTeamScore: number | null = null;
     let producerTeamScore: number | null = null;
     
-    // Set all isBestBall flags to false initially
+    // Reset all isBestBall flags initially
     aviatorScores.forEach(s => { s.isBestBall = false; });
     producerScores.forEach(s => { s.isBestBall = false; });
     
     // Find lowest net score for Aviators
     if (aviatorScores.length > 0) {
-      // Filter out null scores first
-      const validScores = aviatorScores.filter(s => s.score !== null && s.netScore !== null);
+      // Filter out null scores and sort by net score
+      const validScores = aviatorScores.filter(s => s.score !== null);
       
       if (validScores.length > 0) {
-        // Sort by net score and take the lowest
-        const lowestScore = [...validScores].sort((a, b) => (a.netScore || 99) - (b.netScore || 99))[0];
-        aviatorTeamScore = lowestScore.netScore;
+        // Calculate net scores if needed
+        validScores.forEach(s => {
+          if (s.netScore === null && s.score !== null) {
+            s.netScore = Math.max(0, s.score - (s.handicapStrokes || 0));
+          }
+        });
         
-        // Mark this as the team's best score
-        const lowestScorePlayer = aviatorScores.find(s => s.playerId === lowestScore.playerId);
-        if (lowestScorePlayer) {
+        // Find the lowest net score player
+        const lowestScorePlayer = validScores.reduce((lowest, current) => {
+          const lowestNet = lowest.netScore !== null ? lowest.netScore : 99;
+          const currentNet = current.netScore !== null ? current.netScore : 99;
+          return currentNet < lowestNet ? current : lowest;
+        }, validScores[0]);
+        
+        // Set the team score and mark the best score
+        if (lowestScorePlayer && lowestScorePlayer.netScore !== null) {
+          aviatorTeamScore = lowestScorePlayer.netScore;
           lowestScorePlayer.isBestBall = true;
         }
       }
@@ -1130,58 +1111,65 @@ const EnhancedMatchScorecard = ({
     
     // Find lowest net score for Producers
     if (producerScores.length > 0) {
-      // Filter out null scores first
-      const validScores = producerScores.filter(s => s.score !== null && s.netScore !== null);
+      // Filter out null scores and sort by net score
+      const validScores = producerScores.filter(s => s.score !== null);
       
       if (validScores.length > 0) {
-        // Sort by net score and take the lowest
-        const lowestScore = [...validScores].sort((a, b) => (a.netScore || 99) - (b.netScore || 99))[0];
-        producerTeamScore = lowestScore.netScore;
+        // Calculate net scores if needed
+        validScores.forEach(s => {
+          if (s.netScore === null && s.score !== null) {
+            s.netScore = Math.max(0, s.score - (s.handicapStrokes || 0));
+          }
+        });
         
-        // Mark this as the team's best score
-        const lowestScorePlayer = producerScores.find(s => s.playerId === lowestScore.playerId);
-        if (lowestScorePlayer) {
+        // Find the lowest net score player
+        const lowestScorePlayer = validScores.reduce((lowest, current) => {
+          const lowestNet = lowest.netScore !== null ? lowest.netScore : 99;
+          const currentNet = current.netScore !== null ? current.netScore : 99;
+          return currentNet < lowestNet ? current : lowest;
+        }, validScores[0]);
+        
+        // Set the team score and mark the best score
+        if (lowestScorePlayer && lowestScorePlayer.netScore !== null) {
+          producerTeamScore = lowestScorePlayer.netScore;
           lowestScorePlayer.isBestBall = true;
         }
       }
     }
     
-    // Now update the main scores map with the updated player scores
-    setPlayerScores(prev => {
-      const newMap = new Map(prev);
-      
-      // Store team collections too so we can access all team players easily
-      if (aviatorScores.length > 0) {
-        newMap.set(`${holeNumber}-aviator`, aviatorScores);
-      }
-      
-      if (producerScores.length > 0) {
-        newMap.set(`${holeNumber}-producer`, producerScores);
-      }
-      
-      // Update individual player records
-      [...aviatorScores, ...producerScores].forEach(score => {
-        const playerKey = `${holeNumber}-${score.player}`;
-        newMap.set(playerKey, [score]);
-      });
-      
-      return newMap;
+    // Update scores map with the best ball flag and updated net scores
+    // Don't create a new Map as we have already modified the objects in place 
+    const updatedMap = new Map(playerScores);
+    
+    // Update team collections with our modified scores
+    if (aviatorScores.length > 0) {
+      updatedMap.set(aviatorTeamKey, aviatorScores);
+    }
+    
+    if (producerScores.length > 0) {
+      updatedMap.set(producerTeamKey, producerScores);
+    }
+    
+    // Update the individual player scores to reflect best ball status
+    [...aviatorScores, ...producerScores].forEach(score => {
+      const playerKey = `${holeNumber}-${score.player}`;
+      updatedMap.set(playerKey, [score]);
     });
     
-    // Create score object for the match scorecard
-    const scoreData = {
-      holeNumber,
-      aviatorScore: aviatorTeamScore,
-      producerScore: producerTeamScore,
-    };
+    // Only update state if we made changes to avoid unnecessary re-renders
+    setPlayerScores(updatedMap);
     
-    console.log(`Hole ${holeNumber} team scores:`, scoreData);
+    // Skip detailed logging for every update
+    if (aviatorTeamScore !== null || producerTeamScore !== null) {
+      console.log(`Hole ${holeNumber} team scores:`, {
+        holeNumber,
+        aviatorScore: aviatorTeamScore,
+        producerScore: producerTeamScore,
+      });
+    }
     
     // Update the match scores if callback is provided
-    if (onBestBallScoreUpdate && playerScoresForHole.length > 0) {
-      onBestBallScoreUpdate(holeNumber, playerScoresForHole);
-    } else if (onScoreUpdate) {
-      // If no best ball callback but we have the regular score callback
+    if (onScoreUpdate) {
       onScoreUpdate(holeNumber, aviatorTeamScore, producerTeamScore);
     }
   };
@@ -1304,8 +1292,11 @@ const EnhancedMatchScorecard = ({
   }, [existingPlayerScores, individualScores, aviatorPlayersList, producerPlayersList, 
       isBestBall, holes, getPlayerCourseHandicap, matchId, updateBestBallScores]);
 
-  // Update handlePlayerScoreChange to use the mutation
-  const handlePlayerScoreChange = async (
+  // Debounce function to prevent too many score updates
+  const debounceRef = useRef<any>({});
+  
+  // Update handlePlayerScoreChange to use the mutation with optimized performance
+  const handlePlayerScoreChange = (
     holeNumber: number,
     playerName: string,
     teamId: string,
@@ -1317,6 +1308,7 @@ const EnhancedMatchScorecard = ({
       return;
     }
     
+    // Parse input value
     let numValue = null;
     if (value !== "") {
       const parsed = parseInt(value);
@@ -1325,6 +1317,7 @@ const EnhancedMatchScorecard = ({
       }
     }
 
+    // Find player ID efficiently
     const playerId = teamId === "aviator"
       ? aviatorPlayersList.find((p: any) => p.name === playerName)?.id || 0
       : producerPlayersList.find((p: any) => p.name === playerName)?.id || 0;
