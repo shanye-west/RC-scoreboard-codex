@@ -42,6 +42,7 @@ interface BestBallPlayerScore {
   playerId: number;
   handicapStrokes?: number;
   netScore?: number | null;
+  isBestBall?: boolean; // Flag to mark if this score is the best ball for the team
 }
 
 interface MatchScorecardProps {
@@ -1318,7 +1319,7 @@ const EnhancedMatchScorecard = ({
     // First check if the player has been explicitly marked as the best ball
     const playerKey = `${holeNumber}-${playerName}`;
     const playerScoreData = playerScores.get(playerKey) || [];
-    if (playerScoreData.length > 0 && playerScoreData[0].isBestBall === true) {
+    if (playerScoreData.length > 0 && playerScoreData[0].isBestBall) {
       return true;
     }
 
@@ -1335,9 +1336,9 @@ const EnhancedMatchScorecard = ({
       (ps) => ps.player === playerName,
     );
     
-    // For best ball with handicaps, use net scores
+    // If player has no score, they can't be the best ball
     if (!currentPlayerScoreObj || currentPlayerScoreObj.score === null) {
-      return false; // No score recorded
+      return false;
     }
     
     // Get all valid scores (not null)
@@ -1369,39 +1370,6 @@ const EnhancedMatchScorecard = ({
     
     // If this player's net score equals the lowest, they're a best ball
     return currentPlayerNetScore === lowestNetScore;
-      
-      for (const playerScore of holeScores) {
-        if (playerScore.score !== null) {
-          const netScore = playerScore.score - (playerScore.handicapStrokes || 0);
-          if (netScore < lowestNetScore) {
-            lowestNetScore = netScore;
-          }
-        }
-      }
-      
-      if (lowestNetScore === Infinity) return false;
-      
-      // Check if this player has the lowest net score
-      return currentPlayerNetScore === lowestNetScore;
-    } else {
-      // Use gross scores for other match types
-      const currentPlayerScore = currentPlayerScoreObj?.score;
-      
-      if (currentPlayerScore === null || currentPlayerScore === undefined)
-        return false;
-      
-      // Find the minimum score in this team for this hole (excluding nulls)
-      const validScores = holeScores
-        .filter((s) => s.score !== null && s.score !== undefined)
-        .map((s) => s.score || Infinity);
-        
-      if (validScores.length === 0) return false;
-      
-      const lowestScore = Math.min(...validScores);
-      
-      // Check if this player has the lowest score
-      return currentPlayerScore === lowestScore;
-    }
   };
 
   const generateMatchStatus = (
