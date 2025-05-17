@@ -988,14 +988,8 @@ const EnhancedMatchScorecard = ({
     
     console.log("Loading scores from best_ball_player_scores table:", individualScores.length, "scores found");
     
-    // Keep track of what holes we've loaded to avoid duplicate data
-    const scoreKey = `scores-${matchId}`;
-    const scoresLoaded = sessionStorage.getItem(scoreKey);
-    
-    if (scoresLoaded === 'true') {
-      console.log("Individual scores already loaded, skipping...");
-      return;
-    }
+    // Always load scores regardless of session storage
+    console.log("Loading and displaying scores from database...");
     
     // Build the new scores
     setPlayerScores(prevScores => {
@@ -1051,91 +1045,20 @@ const EnhancedMatchScorecard = ({
         newPlayerScores.set(teamKey, existingTeamScores);
       });
       
-      // Mark as loaded
-      sessionStorage.setItem(scoreKey, 'true');
-      console.log("Individual scores loaded and marked as initialized");
+      // Process all holes to calculate best ball scores
+      if (holes && holes.length > 0) {
+        holes.forEach(hole => {
+          updateBestBallScores(hole.number, newPlayerScores);
+        });
+      }
+      
+      console.log("Individual scores loaded and best ball scores calculated");
       
       return newPlayerScores;
     });
-  }, [individualScores, aviatorPlayersList, producerPlayersList, matchId]);
+  }, [individualScores, aviatorPlayersList, producerPlayersList, matchId, holes, updateBestBallScores]);
   
-  // Define updateBestBallScores before using it in useEffect
-  const updateBestBallScores = (
-    holeNumber: number,
-    currentScores: Map<string, BestBallPlayerScore[]>,
-  ) => {
-    if (!isBestBall) return;
-    
-    // Try getting existing team scores from the map directly
-    const aviatorTeamKey = `${holeNumber}-aviator`;
-    const producerTeamKey = `${holeNumber}-producer`;
-    
-    const aviatorScores = currentScores.get(aviatorTeamKey) || [];
-    const producerScores = currentScores.get(producerTeamKey) || [];
-    
-    // Calculate team scores for each team (lowest net score)
-    let aviatorTeamScore: number | null = null;
-    let producerTeamScore: number | null = null;
-    
-    // Reset all isBestBall flags initially
-    aviatorScores.forEach(s => { s.isBestBall = false; });
-    producerScores.forEach(s => { s.isBestBall = false; });
-    
-    // Find lowest net score for Aviators
-    if (aviatorScores.length > 0) {
-      // Filter out null scores and sort by net score
-      const validScores = aviatorScores.filter(s => s.score !== null);
-      
-      if (validScores.length > 0) {
-        // Calculate net scores if needed
-        validScores.forEach(s => {
-          if (s.netScore === null && s.score !== null) {
-            s.netScore = Math.max(0, s.score - (s.handicapStrokes || 0));
-          }
-        });
-        
-        // Find the lowest net score player
-        const lowestScorePlayer = validScores.reduce((lowest, current) => {
-          const lowestNet = lowest.netScore !== null ? lowest.netScore : 99;
-          const currentNet = current.netScore !== null ? current.netScore : 99;
-          return currentNet < lowestNet ? current : lowest;
-        }, validScores[0]);
-        
-        // Set the team score and mark the best score
-        if (lowestScorePlayer && lowestScorePlayer.netScore !== null) {
-          aviatorTeamScore = lowestScorePlayer.netScore;
-          lowestScorePlayer.isBestBall = true;
-        }
-      }
-    }
-    
-    // Find lowest net score for Producers
-    if (producerScores.length > 0) {
-      // Filter out null scores and sort by net score
-      const validScores = producerScores.filter(s => s.score !== null);
-      
-      if (validScores.length > 0) {
-        // Calculate net scores if needed
-        validScores.forEach(s => {
-          if (s.netScore === null && s.score !== null) {
-            s.netScore = Math.max(0, s.score - (s.handicapStrokes || 0));
-          }
-        });
-        
-        // Find the lowest net score player
-        const lowestScorePlayer = validScores.reduce((lowest, current) => {
-          const lowestNet = lowest.netScore !== null ? lowest.netScore : 99;
-          const currentNet = current.netScore !== null ? current.netScore : 99;
-          return currentNet < lowestNet ? current : lowest;
-        }, validScores[0]);
-        
-        // Set the team score and mark the best score
-        if (lowestScorePlayer && lowestScorePlayer.netScore !== null) {
-          producerTeamScore = lowestScorePlayer.netScore;
-          lowestScorePlayer.isBestBall = true;
-        }
-      }
-    }
+  
     
     // Update scores map with the best ball flag and updated net scores
     // Don't create a new Map as we have already modified the objects in place 
@@ -1187,14 +1110,8 @@ const EnhancedMatchScorecard = ({
       return;
     }
     
-    // Check if we've already processed this fallback
-    const fallbackKey = `fallback-scores-${matchId}`;
-    const fallbackProcessed = sessionStorage.getItem(fallbackKey);
-    
-    if (fallbackProcessed === 'true') {
-      console.log("Fallback already processed, skipping...");
-      return;
-    }
+    // Always process fallback scores regardless of session storage state
+    console.log("Processing fallback scores from player_scores table...");
     
     console.log("Fallback: Loading scores from player_scores table:", existingPlayerScores.length, "scores found");
     
