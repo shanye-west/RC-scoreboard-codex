@@ -1307,18 +1307,28 @@ const EnhancedMatchScorecard = ({
     }, 100);
   };
 
-  // Define isLowestScore function that was missing
+  // Define isLowestScore function to properly identify the best ball score
   const isLowestScore = (
     holeNumber: number,
     playerName: string,
     teamId: string,
   ): boolean => {
     if (!isBestBall) return true; // Not applicable for non-Best Ball matches
+    
+    // First check if the player has been explicitly marked as the best ball
+    const playerKey = `${holeNumber}-${playerName}`;
+    const playerScoreData = playerScores.get(playerKey) || [];
+    if (playerScoreData.length > 0 && playerScoreData[0].isBestBall === true) {
+      return true;
+    }
 
+    // Get all scores for this hole and team
     const key = `${holeNumber}-${teamId}`;
     const holeScores = playerScores.get(key) || [];
 
-    if (holeScores.length < 2) return true; // If only one player, they are the best
+    // If no scores or only one player, they're automatically the best
+    if (holeScores.length === 0) return false;
+    if (holeScores.length === 1) return holeScores[0].player === playerName;
 
     // Find current player's score
     const currentPlayerScoreObj = holeScores.find(
@@ -1326,18 +1336,39 @@ const EnhancedMatchScorecard = ({
     );
     
     // For best ball with handicaps, use net scores
-    if (isBestBall) {
-      if (!currentPlayerScoreObj || currentPlayerScoreObj.score === null) {
-        return false; // No score recorded
-      }
+    if (!currentPlayerScoreObj || currentPlayerScoreObj.score === null) {
+      return false; // No score recorded
+    }
+    
+    // Get all valid scores (not null)
+    const validScores = holeScores.filter(p => p.score !== null);
+    if (validScores.length === 0) return false;
+    
+    // Sort by net score (lowest first)
+    const sortedScores = [...validScores].sort((a, b) => {
+      const aNetScore = a.netScore !== undefined && a.netScore !== null 
+        ? a.netScore 
+        : (a.score! - (a.handicapStrokes || 0));
+        
+      const bNetScore = b.netScore !== undefined && b.netScore !== null
+        ? b.netScore
+        : (b.score! - (b.handicapStrokes || 0));
+        
+      return aNetScore - bNetScore;
+    });
+    
+    // Current player's net score
+    const currentPlayerNetScore = currentPlayerScoreObj.netScore !== undefined && currentPlayerScoreObj.netScore !== null
+      ? currentPlayerScoreObj.netScore
+      : (currentPlayerScoreObj.score - (currentPlayerScoreObj.handicapStrokes || 0));
       
-      // Calculate current player's net score
-      const currentPlayerScore = currentPlayerScoreObj.score;
-      const currentPlayerHandicapStrokes = currentPlayerScoreObj.handicapStrokes || 0;
-      const currentPlayerNetScore = currentPlayerScore - currentPlayerHandicapStrokes;
-      
-      // Find the minimum net score in this team for this hole
-      let lowestNetScore = Infinity;
+    // Find the lowest net score in the team 
+    let lowestNetScore = sortedScores[0].netScore !== undefined && sortedScores[0].netScore !== null
+      ? sortedScores[0].netScore
+      : (sortedScores[0].score! - (sortedScores[0].handicapStrokes || 0));
+    
+    // If this player's net score equals the lowest, they're a best ball
+    return currentPlayerNetScore === lowestNetScore;
       
       for (const playerScore of holeScores) {
         if (playerScore.score !== null) {
