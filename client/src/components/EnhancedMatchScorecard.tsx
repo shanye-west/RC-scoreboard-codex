@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -1322,10 +1322,22 @@ const EnhancedMatchScorecard = ({
       ? aviatorPlayersList.find((p: any) => p.name === playerName)?.id || 0
       : producerPlayersList.find((p: any) => p.name === playerName)?.id || 0;
     
+    if (!playerId) {
+      console.warn("Could not find player ID for", playerName);
+      return;
+    }
+    
+    // Get handicap information
     const courseHandicap = getPlayerCourseHandicap(playerId);
     const hole = holes.find(h => h.number === holeNumber);
-    const handicapRank = hole?.handicapRank || 0;
+    if (!hole) {
+      console.warn("Could not find hole", holeNumber);
+      return;
+    }
     
+    const handicapRank = hole.handicapRank || 0;
+    
+    // Calculate handicap strokes
     let handicapStrokes = 0;
     if (isBestBall && handicapRank > 0 && courseHandicap >= handicapRank) {
       handicapStrokes = 1;
@@ -1334,71 +1346,63 @@ const EnhancedMatchScorecard = ({
       }
     }
     
-    const netScore = numValue !== null ? numValue - handicapStrokes : null;
-
-    // Save to database with error handling
-    try {
-      await saveScoreMutation.mutateAsync({
-        matchId,
-        playerId,
-        holeNumber,
-        score: numValue,
-        handicapStrokes,
-        netScore
-      });
-      
-      // Also save to player_scores table for redundancy
-      if (numValue !== null) {
-        try {
-          await savePlayerScoreMutation.mutate({
-            playerId,
-            matchId,
-            holeNumber,
-            score: numValue,
-            tournamentId: matchData?.tournamentId
-          });
-        } catch (error) {
-          console.error("Error saving to player_scores:", error);
-          // Don't block the UI flow if this fails
-        }
-      }
-    } catch (error) {
-      console.error("Error saving score:", error);
-      alert("Failed to save your score. Please try again.");
-      // Continue with local state update anyway to maintain user experience
-    }
-
-    // Update local state
-    const teamKey = `${holeNumber}-${teamId}`;
-    const playerKey = `${holeNumber}-${playerName}`;
-
-    let holeScores = playerScores.get(teamKey) || [];
-    const playerIndex = holeScores.findIndex((ps) => ps.player === playerName);
+    // Calculate net score with floor at 0
+    const netScore = numValue !== null ? Math.max(0, numValue - handicapStrokes) : null;
     
-    const playerScoreObj = {
+    // Create player score object
+    const playerScoreObj: BestBallPlayerScore = {
       player: playerName,
       score: numValue,
       teamId,
       playerId,
       handicapStrokes,
-      netScore
+      netScore,
+      isBestBall: false // Will be set in updateBestBallScores
     };
-
-    if (playerIndex >= 0) {
-      holeScores[playerIndex] = playerScoreObj;
-    } else {
-      holeScores.push(playerScoreObj);
-    }
-
+    
+    // Keys for this hole's scores
+    const teamKey = `${holeNumber}-${teamId}`;
+    const playerKey = `${holeNumber}-${playerName}`;
+    
+    // Update local state immediately for responsive UI
     const newPlayerScores = new Map(playerScores);
-    newPlayerScores.set(teamKey, holeScores);
+    
+    // Update individual player score
     newPlayerScores.set(playerKey, [playerScoreObj]);
-
+    
+    // Update team collection
+    let teamScores = [...(newPlayerScores.get(teamKey) || [])];
+    const existingIndex = teamScores.findIndex(s => s.playerId === playerId);
+    
+    if (existingIndex >= 0) {
+      teamScores[existingIndex] = playerScoreObj;
+    } else {
+      teamScores.push(playerScoreObj);
+    }
+    
+    newPlayerScores.set(teamKey, teamScores);
     setPlayerScores(newPlayerScores);
-
-    // Persist the player score to the database if it's a valid score
-    if (playerId && numValue !== null) {
-      try {
+    
+    // Debounce saving to database
+    const scoreKey = `${playerId}-${holeNumber}`;
+    if (debounceRef.current[scoreKey]) {
+      clearTimeout(debounceRef.current[scoreKey]);
+    }
+    
+    debounceRef.current[scoreKey] = setTimeout(() => {
+      // Save to both tables without blocking the UI
+      if (numValue !== null) {
+        // Save to best_ball_scores table first
+        saveScoreMutation.mutate({
+          matchId,
+          playerId,
+          holeNumber,
+          score: numValue,
+          handicapStrokes,
+          netScore
+        });
+        
+        // Also save to player_scores table for redundancy
         savePlayerScoreMutation.mutate({
           playerId,
           matchId,
@@ -1406,14 +1410,18 @@ const EnhancedMatchScorecard = ({
           score: numValue,
           tournamentId: matchData?.tournamentId
         });
-      } catch (error) {
-        console.error("Error saving player score:", error);
       }
-    }
-
-    // Calculate the best score for each team and update the match
-    updateBestBallScores(holeNumber, newPlayerScores);
-
+      
+      // Update best ball scores after a short delay
+      // This helps batch updates and reduce server load
+      setTimeout(() => {
+        updateBestBallScores(holeNumber, newPlayerScores);
+      }, 50);
+      
+      delete debounceRef.current[scoreKey];
+    }, 200); // 200ms debounce threshold
+    
+    // Auto-blur input after entering score for better mobile UX
     setTimeout(() => {
       if (value !== "1" && value !== "") {
         target.blur();
