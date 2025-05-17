@@ -1189,9 +1189,6 @@ const EnhancedMatchScorecard = ({
     
     console.log("Loading scores from player_scores table:", existingPlayerScores.length, "scores found");
     
-    // Create a flag to track if we found new scores to add
-    let foundNewScores = false;
-    
     // Apply fallback scores as a single state update
     setPlayerScores(prevScores => {
       const newPlayerScores = new Map(prevScores);
