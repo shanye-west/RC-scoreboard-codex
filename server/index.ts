@@ -4,10 +4,11 @@
 import "dotenv/config";
 
 import express, { Request, Response, NextFunction } from "express";
-// 2) Import both your Drizzle ORM client and Neon Pool
-import { db, pool } from "./db";
+// 2) Import the Neon Pool
+import { pool } from "./db";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { captureError } from "./lib/logger";
 
 const app = express();
 
@@ -44,12 +45,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Helper function to capture error details
-function captureError(err: any) {
-  const timestamp = new Date().toISOString();
-  console.error(`[${timestamp}] Error:`, err);
-  return { timestamp, error: err };
-}
 
 (async () => {
   // 3) Smoke-test Neon on startup
