@@ -95,13 +95,13 @@ function captureError(err: any) {
     serveStatic(app);
   }
 
-  // 8) Listen on Replit’s PORT or default to 3000
+  // 8) Listen on Replit’s PORT or default to 5000
   const port = Number(process.env.PORT) || 3000;
   server.listen(
     {
-      host: "localhost",
+      host: "0.0.0.0",
       port,
-      
+      reusePort: true,
     },
     () => {
       log(`serving on port ${port}`);

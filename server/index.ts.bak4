@@ -101,7 +101,7 @@ function captureError(err: any) {
     {
       host: "localhost",
       port,
-      
+      reusePort: true,
     },
     () => {
       log(`serving on port ${port}`);
