@@ -150,7 +150,7 @@
                 Completed
               </span>
               {match.locked && (
-                <Lock className="h-3 w-3 text-gray-500" title="Match locked" />
+                <Lock className="h-3 w-3 text-gray-500" />
               )}
             </div>
           );
@@ -161,7 +161,7 @@
                 In Progress
               </span>
               {match.locked && (
-                <Lock className="h-3 w-3 text-gray-500" title="Match locked" />
+                <Lock className="h-3 w-3 text-gray-500" />
               )}
             </div>
           );
@@ -172,7 +172,7 @@
                 Upcoming
               </span>
               {match.locked && (
-                <Lock className="h-3 w-3 text-gray-500" title="Match locked" />
+                <Lock className="h-3 w-3 text-gray-500" />
               )}
             </div>
           );

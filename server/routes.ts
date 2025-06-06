@@ -1751,11 +1751,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let bets;
       
       // Admin can see all bets, users can only see their own
-      if (req.user.isAdmin) {
-        bets = await storage.getBets();
-      } else {
-        bets = await storage.getUserBets(req.user.id);
-      }
+        if (req.user!.isAdmin) {
+          bets = await storage.getBets();
+        } else {
+          bets = await storage.getUserBets(req.user!.id);
+        }
       
       res.json(bets);
     } catch (error) {
@@ -1766,7 +1766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/bets/user', isAuthenticated, async (req, res) => {
     try {
-      const bets = await storage.getUserBets(req.user.id);
+        const bets = await storage.getUserBets(req.user!.id);
       res.json(bets);
     } catch (error) {
       console.error("Error getting user bets:", error);
@@ -1799,10 +1799,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/bets', isAuthenticated, async (req, res) => {
     try {
       // Ensure user is placing bet for themselves (unless admin)
-      const data = {
-        ...insertBetSchema.parse(req.body),
-        userId: req.user.id, // Always use the authenticated user's ID
-      };
+        const data = {
+          ...insertBetSchema.parse(req.body),
+          userId: req.user!.id, // Always use the authenticated user's ID
+        };
       
       // Calculate potential payout based on odds
       if (data.amount && data.odds) {
@@ -1825,7 +1825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, actualResult } = req.body;
       
       // Only admins can settle bets
-      const result = await storage.settleBet(betId, status, actualResult, req.user.id);
+        const result = await storage.settleBet(betId, status, actualResult, req.user!.id);
       res.json(result);
     } catch (error) {
       console.error("Error settling bet:", error);
@@ -1839,7 +1839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { betIds, ...parlayData } = req.body;
       const data = {
         ...insertParlaySchema.parse(parlayData),
-        userId: req.user.id, // Always use the authenticated user's ID
+          userId: req.user!.id, // Always use the authenticated user's ID
       };
       
       const result = await storage.createParlay(data, betIds);
@@ -1855,11 +1855,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let parlays;
       
       // Admin can see all parlays, users can only see their own
-      if (req.user.isAdmin) {
-        parlays = await storage.getParlays();
-      } else {
-        parlays = await storage.getUserParlays(req.user.id);
-      }
+        if (req.user!.isAdmin) {
+          parlays = await storage.getParlays();
+        } else {
+          parlays = await storage.getUserParlays(req.user!.id);
+        }
       
       res.json(parlays);
     } catch (error) {
@@ -1874,11 +1874,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let entries;
       
       // Admin can see all ledger entries, users can only see their own
-      if (req.user.isAdmin) {
-        entries = await storage.getLedgerEntries();
-      } else {
-        entries = await storage.getUserLedgerEntries(req.user.id);
-      }
+        if (req.user!.isAdmin) {
+          entries = await storage.getLedgerEntries();
+        } else {
+          entries = await storage.getUserLedgerEntries(req.user!.id);
+        }
       
       res.json(entries);
     } catch (error) {
@@ -1889,7 +1889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/ledger/balance', isAuthenticated, async (req, res) => {
     try {
-      const balance = await storage.getUserBalance(req.user.id);
+        const balance = await storage.getUserBalance(req.user!.id);
       res.json(balance);
     } catch (error) {
       console.error("Error getting user balance:", error);

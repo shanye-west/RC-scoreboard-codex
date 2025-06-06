@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import type { Bet, BetType, Match, Round, Player } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -64,7 +65,7 @@ export default function Sportsbook() {
     data: betTypes,
     isLoading: isLoadingBetTypes,
     error: betTypesError,
-  } = useQuery({
+  } = useQuery<BetType[]>({
     queryKey: ["/api/bet-types"],
     enabled: true,
   });
@@ -75,7 +76,7 @@ export default function Sportsbook() {
     isLoading: isLoadingUserBets,
     error: userBetsError,
     refetch: refetchUserBets,
-  } = useQuery({
+  } = useQuery<Bet[]>({
     queryKey: ["/api/bets/user"],
     enabled: isAuthenticated,
   });
@@ -85,7 +86,7 @@ export default function Sportsbook() {
     data: matches,
     isLoading: isLoadingMatches,
     error: matchesError,
-  } = useQuery({
+  } = useQuery<Match[]>({
     queryKey: ["/api/matches"],
     enabled: true,
   });
@@ -95,7 +96,7 @@ export default function Sportsbook() {
     data: rounds,
     isLoading: isLoadingRounds,
     error: roundsError,
-  } = useQuery({
+  } = useQuery<Round[]>({
     queryKey: ["/api/rounds"],
     enabled: true,
   });
@@ -105,7 +106,7 @@ export default function Sportsbook() {
     data: players,
     isLoading: isLoadingPlayers,
     error: playersError,
-  } = useQuery({
+  } = useQuery<Player[]>({
     queryKey: ["/api/players"],
     enabled: true,
   });
