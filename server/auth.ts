@@ -4,6 +4,7 @@ import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -33,7 +34,18 @@ async function comparePasswords(supplied: string, stored: string) {
     return supplied === stored;
   }
   
-  // Check if stored password has the expected format (hash.salt)
+  // Check if it's a bcrypt hash (starts with $2b$)
+  if (stored.startsWith('$2b$')) {
+    // Use bcrypt to compare for legacy admin user
+    try {
+      return await bcrypt.compare(supplied, stored);
+    } catch (error) {
+      console.error('Error comparing bcrypt password:', error);
+      return false;
+    }
+  }
+  
+  // Check if stored password has the expected scrypt format (hash.salt)
   if (!stored || !stored.includes('.')) {
     console.error('Invalid password format in database: missing salt separator');
     // Fallback for direct comparison in case the password was stored incorrectly
@@ -48,6 +60,13 @@ async function comparePasswords(supplied: string, stored: string) {
   
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+  
+  // Check if buffers have the same length before using timingSafeEqual
+  if (hashedBuf.length !== suppliedBuf.length) {
+    console.error('Hash length mismatch:', { hashedLength: hashedBuf.length, suppliedLength: suppliedBuf.length });
+    return false;
+  }
+  
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
