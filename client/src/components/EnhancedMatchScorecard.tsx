@@ -50,6 +50,13 @@ interface ScorecardProps {
   isBestBall?: boolean;
   matchData?: any;
   roundHandicaps?: any[];
+  /** Callback for updating team scores */
+  onScoreUpdate?: (
+    hole: number,
+    aviatorScore: number | null,
+    producerScore: number | null,
+  ) => void;
+  /** @deprecated use onScoreUpdate instead */
   onUpdateScores?: (scores: HoleScore[]) => void;
   canEditScores?: boolean;
 }
@@ -82,6 +89,7 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   isBestBall = false,
   matchData = null,
   roundHandicaps = [],
+  onScoreUpdate,
   onUpdateScores,
   canEditScores = true,
 }) => {
@@ -92,12 +100,20 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   const [playerTotals, setPlayerTotals] = useState<Map<string, number>>(new Map());
   const [playerFrontNineTotals, setPlayerFrontNineTotals] = useState<Map<string, number>>(new Map());
   const [playerBackNineTotals, setPlayerBackNineTotals] = useState<Map<string, number>>(new Map());
+
+  // Local copy of team scores so we can edit before persisting
+  const [teamScores, setTeamScores] = useState<HoleScore[]>([]);
   
   const [handicapDialogOpen, setHandicapDialogOpen] = useState(false);
   const [currentHandicapPlayer, setCurrentHandicapPlayer] = useState<number | null>(null);
   const [handicapValue, setHandicapValue] = useState<number>(0);
   const [playerHandicaps, setPlayerHandicaps] = useState<Map<number, number>>(new Map());
   const [holeArray, setHoleArray] = useState<any[]>([]);
+
+  // Keep local team score state in sync with scores prop
+  useEffect(() => {
+    setTeamScores(scores);
+  }, [scores]);
   
   // Load match scores
   const { data: matchScores, isLoading: scoresLoading } = useQuery({
@@ -302,8 +318,32 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
             }
           }
         });
+
+        // Build team score array using lowest net from each team
+        const newTeamScores: HoleScore[] = holes.map(h => {
+          const atk = `${h.number}-aviator`;
+          const ptk = `${h.number}-producer`;
+          const aVals = (newPlayerScores.get(atk) || []).filter(s => s.score !== null);
+          const pVals = (newPlayerScores.get(ptk) || []).filter(s => s.score !== null);
+
+          const bestA = aVals.length
+            ? aVals.reduce((l, c) => (c.netScore! < l.netScore! ? c : l)).netScore
+            : null;
+          const bestP = pVals.length
+            ? pVals.reduce((l, c) => (c.netScore! < l.netScore! ? c : l)).netScore
+            : null;
+
+          const existing = scores.find(s => s.holeNumber === h.number);
+          return {
+            holeNumber: h.number,
+            aviatorScore: bestA ?? existing?.aviatorScore ?? null,
+            producerScore: bestP ?? existing?.producerScore ?? null,
+          } as HoleScore;
+        });
+
+        setTeamScores(newTeamScores);
       }
-      
+
       return newPlayerScores;
     });
   }, [individualScores, aviatorPlayersList, producerPlayersList, matchId, holes, getPlayerCourseHandicap]);
@@ -382,24 +422,24 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
       
       // Update team collection
       const teamKey = `${holeNumber}-${teamId}`;
-      const teamScores = [...(newScores.get(teamKey) || [])];
-      const existingIndex = teamScores.findIndex(s => s.playerId === playerId);
+      const teamScoreList = [...(newScores.get(teamKey) || [])];
+      const existingIndex = teamScoreList.findIndex(s => s.playerId === playerId);
       
       if (existingIndex >= 0) {
-        teamScores[existingIndex] = playerScoreObj;
+        teamScoreList[existingIndex] = playerScoreObj;
       } else {
-        teamScores.push(playerScoreObj);
+        teamScoreList.push(playerScoreObj);
       }
-      
-      newScores.set(teamKey, teamScores);
-      
+
+      newScores.set(teamKey, teamScoreList);
+
       // Calculate best ball for this hole only
       if (isBestBall) {
         // Reset isBestBall flags
-        teamScores.forEach(s => { s.isBestBall = false; });
-        
+        teamScoreList.forEach(s => { s.isBestBall = false; });
+
         // Filter valid scores
-        const validScores = teamScores.filter(s => s.score !== null);
+        const validScores = teamScoreList.filter(s => s.score !== null);
         
         if (validScores.length > 0) {
           // Calculate net scores if needed
@@ -420,9 +460,17 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
           if (lowestScorePlayer) {
             lowestScorePlayer.isBestBall = true;
           }
+
+          // Update team score for this hole using lowest net
+          const best = validScores.reduce((l, c) => (c.netScore! < l.netScore! ? c : l));
+          setTeamScores(prev => prev.map(sc => sc.holeNumber === holeNumber ? {
+            ...sc,
+            aviatorScore: teamId === 'aviator' ? best.netScore : sc.aviatorScore,
+            producerScore: teamId === 'producer' ? best.netScore : sc.producerScore,
+          } : sc));
         }
       }
-      
+
       return newScores;
     });
     
@@ -461,8 +509,37 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
         target.blur();
       }
     }, 100);
+  }; 
+
+  // Handle changes to team scores for scramble/shamble formats
+  const handleTeamScoreChange = (
+    holeNumber: number,
+    teamId: 'aviator' | 'producer',
+    value: string,
+  ) => {
+    if (!canEditScores || locked) return;
+
+    const num = value === '' ? null : parseInt(value);
+
+    setTeamScores(prev => {
+      const updated = prev.map(s =>
+        s.holeNumber === holeNumber
+          ? {
+              ...s,
+              aviatorScore: teamId === 'aviator' ? num : s.aviatorScore,
+              producerScore: teamId === 'producer' ? num : s.producerScore,
+            }
+          : s,
+      );
+
+      const score = updated.find(s => s.holeNumber === holeNumber);
+      if (onScoreUpdate && score) {
+        onScoreUpdate(holeNumber, score.aviatorScore, score.producerScore);
+      }
+      return updated;
+    });
   };
-  
+
   // Function to get player score for rendering in inputs
   const getPlayerScoreValue = (
     holeNumber: number,
@@ -542,9 +619,9 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   
   // Get the team score for a hole
   const getScoreInputValue = (holeNumber: number, teamId: string): string => {
-    const score = scores.find((s) => s.holeNumber === holeNumber);
+    const score = teamScores.find((s) => s.holeNumber === holeNumber);
     if (!score) return "";
-    
+
     const value = teamId === "aviator" ? score.aviatorScore : score.producerScore;
     return value !== null ? value.toString() : "";
   };
@@ -655,9 +732,9 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   // Check if a hole is greyed out (can't be edited)
   const isHoleGreyedOut = (holeNumber: number): boolean => {
     if (locked) return true;
-    
+
     // Calculate which hole is the current hole based on scores
-    const completedHoles = scores
+    const completedHoles = teamScores
       .filter((s) => s.aviatorScore !== null && s.producerScore !== null)
       .map((s) => s.holeNumber);
     
@@ -673,13 +750,13 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   // Helper for match status text
   const generateMatchStatus = (holeNumber: number): { text: string; color: string } => {
     // Check if this hole has been played
-    const thisHoleScore = scores.find((s) => s.holeNumber === holeNumber);
+    const thisHoleScore = teamScores.find((s) => s.holeNumber === holeNumber);
     if (!thisHoleScore || thisHoleScore.aviatorScore === null || thisHoleScore.producerScore === null) {
       return { text: "-", color: "text-gray-400" }; // Hole not completed yet
     }
     
     // Get completed holes up to this one
-    const completedScores = scores
+    const completedScores = teamScores
       .filter(s => s.holeNumber <= holeNumber && s.aviatorScore !== null && s.producerScore !== null)
       .sort((a, b) => a.holeNumber - b.holeNumber);
     
@@ -700,12 +777,12 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
     const diff = aviatorWins - producerWins;
     let text = "AS"; // All Square
     let color = "text-black";
-    
+
     if (diff > 0) {
-      text = `A${diff}`;
+      text = `${diff} UP`;
       color = "text-aviator";
     } else if (diff < 0) {
-      text = `P${Math.abs(diff)}`;
+      text = `${Math.abs(diff)} UP`;
       color = "text-producer";
     }
     
@@ -717,11 +794,11 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   const frontNine = [...holes].filter((h) => h.number <= 9).sort((a, b) => a.number - b.number);
   const backNine = [...holes].filter((h) => h.number > 9).sort((a, b) => a.number - b.number);
 
-  const aviatorTeamTotal = scores
+  const aviatorTeamTotal = teamScores
     .filter((s) => s.aviatorScore !== null)
     .reduce((acc, s) => acc + (s.aviatorScore || 0), 0);
 
-  const producerTeamTotal = scores
+  const producerTeamTotal = teamScores
     .filter((s) => s.producerScore !== null)
     .reduce((acc, s) => acc + (s.producerScore || 0), 0);
 
@@ -908,13 +985,14 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                 pattern="[0-9]*"
                                 className="score-input w-8 h-8 text-center border border-gray-300 rounded"
                                 value={getScoreInputValue(hole.number, "aviator")}
-                                disabled={true}
+                                onChange={(e) => handleTeamScoreChange(hole.number, 'aviator', e.target.value)}
+                                disabled={locked || !canEditScores}
                               />
                             )}
                           </td>
                         ))}
                         <td className="py-2 px-2 text-center font-semibold bg-gray-100">
-                          {scores
+                          {teamScores
                             .filter(
                               (s) =>
                                 s.holeNumber > 9 &&
@@ -1048,13 +1126,14 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                 pattern="[0-9]*"
                                 className="score-input w-8 h-8 text-center border border-gray-300 rounded"
                                 value={getScoreInputValue(hole.number, "producer")}
-                                disabled={true}
+                                onChange={(e) => handleTeamScoreChange(hole.number, 'producer', e.target.value)}
+                                disabled={locked || !canEditScores}
                               />
                             )}
                           </td>
                         ))}
                         <td className="py-2 px-2 text-center font-semibold bg-gray-100">
-                          {scores
+                          {teamScores
                             .filter(
                               (s) =>
                                 s.holeNumber > 9 &&
