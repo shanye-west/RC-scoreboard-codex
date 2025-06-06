@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import type { BestBallScore, PlayerScore } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -40,8 +41,8 @@ interface HoleScore {
 interface ScorecardProps {
   matchId: number;
   holes: any[];
-  aviatorPlayersList: any[];
-  producerPlayersList: any[];
+  aviatorPlayersList?: any[];
+  producerPlayersList?: any[];
   participants: any[];
   scores: HoleScore[];
   locked?: boolean;
@@ -94,7 +95,7 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   canEditScores = true,
 }) => {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   
   const [playerScores, setPlayerScores] = useState<Map<string, BestBallPlayerScore[]>>(new Map());
   const [playerTotals, setPlayerTotals] = useState<Map<string, number>>(new Map());
@@ -116,19 +117,19 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   }, [scores]);
   
   // Load match scores
-  const { data: matchScores, isLoading: scoresLoading } = useQuery({
+  const { data: matchScores, isLoading: scoresLoading } = useQuery<HoleScore[]>({
     queryKey: [`/api/scores?matchId=${matchId}`],
     enabled: !!matchId,
   });
   
   // Load individual player scores from best ball table if this is a best ball match
-  const { data: individualScores, isLoading: individualScoresLoading } = useQuery({
+  const { data: individualScores, isLoading: individualScoresLoading } = useQuery<BestBallScore[]>({
     queryKey: [`/api/best-ball-scores/${matchId}`],
     enabled: !!matchId && isBestBall,
   });
   
   // Load player scores from the player_scores table
-  const { data: existingPlayerScores, isLoading: existingScoresLoading } = useQuery({
+  const { data: existingPlayerScores, isLoading: existingScoresLoading } = useQuery<PlayerScore[]>({
     queryKey: [`/api/player-scores?matchId=${matchId}`],
     enabled: !!matchId,
   });
@@ -275,8 +276,8 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
               
               // Find lowest net score
               const lowestNetPlayer = validScores.reduce((lowest, current) => {
-                const lowestNet = lowest.netScore !== null ? lowest.netScore : 99;
-                const currentNet = current.netScore !== null ? current.netScore : 99;
+                const lowestNet = lowest.netScore ?? 99;
+                const currentNet = current.netScore ?? 99;
                 return currentNet < lowestNet ? current : lowest;
               }, validScores[0]);
               
@@ -306,8 +307,8 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
               
               // Find lowest net score
               const lowestNetPlayer = validScores.reduce((lowest, current) => {
-                const lowestNet = lowest.netScore !== null ? lowest.netScore : 99;
-                const currentNet = current.netScore !== null ? current.netScore : 99;
+                const lowestNet = lowest.netScore ?? 99;
+                const currentNet = current.netScore ?? 99;
                 return currentNet < lowestNet ? current : lowest;
               }, validScores[0]);
               
@@ -451,8 +452,8 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
           
           // Find lowest net score
           const lowestScorePlayer = validScores.reduce((lowest, current) => {
-            const lowestNet = lowest.netScore !== null ? lowest.netScore : 99;
-            const currentNet = current.netScore !== null ? current.netScore : 99;
+            const lowestNet = lowest.netScore ?? 99;
+            const currentNet = current.netScore ?? 99;
             return currentNet < lowestNet ? current : lowest;
           }, validScores[0]);
           
@@ -462,12 +463,27 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
           }
 
           // Update team score for this hole using lowest net
-          const best = validScores.reduce((l, c) => (c.netScore! < l.netScore! ? c : l));
-          setTeamScores(prev => prev.map(sc => sc.holeNumber === holeNumber ? {
-            ...sc,
-            aviatorScore: teamId === 'aviator' ? best.netScore : sc.aviatorScore,
-            producerScore: teamId === 'producer' ? best.netScore : sc.producerScore,
-          } : sc));
+          const best = validScores.reduce(
+            (l, c) => ((c.netScore ?? 99) < (l.netScore ?? 99) ? c : l),
+            validScores[0],
+          );
+          setTeamScores((prev) =>
+            prev.map((sc) =>
+              sc.holeNumber === holeNumber
+                ? {
+                    ...sc,
+                    aviatorScore:
+                      teamId === 'aviator'
+                        ? best.netScore ?? sc.aviatorScore
+                        : sc.aviatorScore,
+                    producerScore:
+                      teamId === 'producer'
+                        ? best.netScore ?? sc.producerScore
+                        : sc.producerScore,
+                  }
+                : sc,
+            ),
+          );
         }
       }
 
@@ -922,7 +938,11 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                         className={`score-input w-8 h-8 text-center border border-gray-300 rounded 
                                           ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed" : ""} 
                                           ${!isLowest ? "non-counting-score" : ""}
-                                          ${playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 ? "handicap-stroke" : ""}`}
+                                          ${
+                                            (playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes ?? 0) > 0
+                                              ? "handicap-stroke"
+                                              : ""
+                                          }`}
                                         value={getPlayerScoreValue(
                                           hole.number,
                                           player.name,
@@ -942,8 +962,8 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                         disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
-                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
-                                       playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                                        {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null &&
+                                         (playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes ?? 0) > 0 && (
                                         <span className="net-score">
                                           ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
                                         </span>
@@ -1063,7 +1083,11 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                         className={`score-input w-8 h-8 text-center border border-gray-300 rounded 
                                           ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed" : ""} 
                                           ${!isLowest ? "non-counting-score" : ""}
-                                          ${playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 ? "handicap-stroke" : ""}`}
+                                          ${
+                                            (playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes ?? 0) > 0
+                                              ? "handicap-stroke"
+                                              : ""
+                                          }`}
                                         value={getPlayerScoreValue(
                                           hole.number,
                                           player.name,
@@ -1083,8 +1107,8 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                         disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
-                                      {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null && 
-                                       playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes > 0 && (
+                                        {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null &&
+                                         (playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes ?? 0) > 0 && (
                                         <span className="net-score">
                                           ({playerScores.get(`${hole.number}-${player.name}`)?.[0]?.netScore})
                                         </span>

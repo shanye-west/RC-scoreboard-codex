@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Player, MatchPlayer } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -132,12 +133,15 @@ const Match = ({ id }: { id: number }) => {
   });
 
   // Fetch players data for match editing
-  const { data: players = [], isLoading: isPlayersLoading } = useQuery({
+  const { data: players = [], isLoading: isPlayersLoading } = useQuery<Player[]>({
     queryKey: ["/api/players"],
   });
 
   // Fetch match participants to populate selected players
-  const { data: participants = [], isLoading: isParticipantsLoading } = useQuery({
+  const {
+    data: participants = [],
+    isLoading: isParticipantsLoading,
+  } = useQuery<MatchPlayer[]>({
     queryKey: [`/api/match-players?matchId=${id}`],
     enabled: !!id,
   });
@@ -576,8 +580,6 @@ const Match = ({ id }: { id: number }) => {
             holes={holes || []}
             scores={scores || []}
             onScoreUpdate={handleScoreUpdate}
-            matchStatus={match.status}
-            matchType={round?.matchType || ""}
             locked={isLocked}
             participants={participants}
           />

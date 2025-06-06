@@ -664,7 +664,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
                             }
                           }}
                         />
-                        {scoreData?.handicapStrokes > 0 && (
+                          {(scoreData?.handicapStrokes ?? 0) > 0 && (
                           <span className="handicap-dot">•</span>
                         )}
                         {scoreData?.netScore !== null && scoreData?.netScore !== undefined && (
@@ -714,7 +714,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
                             }
                           }}
                         />
-                        {scoreData?.handicapStrokes > 0 && (
+                          {(scoreData?.handicapStrokes ?? 0) > 0 && (
                           <span className="handicap-dot">•</span>
                         )}
                         {scoreData?.netScore !== null && scoreData?.netScore !== undefined && (
@@ -793,7 +793,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
                             }
                           }}
                         />
-                        {scoreData?.handicapStrokes > 0 && (
+                          {(scoreData?.handicapStrokes ?? 0) > 0 && (
                           <span className="handicap-dot">•</span>
                         )}
                         {scoreData?.netScore !== null && scoreData?.netScore !== undefined && (
@@ -843,7 +843,7 @@ const BestBallScorecard: React.FC<BestBallScorecardProps> = ({
                             }
                           }}
                         />
-                        {scoreData?.handicapStrokes > 0 && (
+                          {(scoreData?.handicapStrokes ?? 0) > 0 && (
                           <span className="handicap-dot">•</span>
                         )}
                         {scoreData?.netScore !== null && scoreData?.netScore !== undefined && (

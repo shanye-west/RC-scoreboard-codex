@@ -191,10 +191,15 @@ export interface IStorage {
   getBetsByMatch(matchId: number): Promise<Bet[]>;
   getBetsByRound(roundId: number): Promise<Bet[]>;
   getBetsByPlayer(playerId: number): Promise<Bet[]>;
-  getBetsByStatus(status: string): Promise<Bet[]>;
+  getBetsByStatus(status: Bet["status"]): Promise<Bet[]>;
   createBet(data: InsertBet): Promise<Bet>;
   updateBet(id: number, data: Partial<Bet>): Promise<Bet | undefined>;
-  settleBet(id: number, status: string, actualResult: string, settledBy: number): Promise<Bet>;
+  settleBet(
+    id: number,
+    status: Bet["status"],
+    actualResult: string,
+    settledBy: number,
+  ): Promise<Bet>;
   
   // Sportsbook methods - Parlays
   getParlays(): Promise<Parlay[]>;
@@ -2114,7 +2119,7 @@ export class DBStorage implements IStorage {
     return db.select().from(bets).where(eq(bets.playerId, playerId));
   }
 
-  async getBetsByStatus(status: string): Promise<Bet[]> {
+  async getBetsByStatus(status: Bet["status"]): Promise<Bet[]> {
     return db.select().from(bets).where(eq(bets.status, status));
   }
 
@@ -2145,7 +2150,12 @@ export class DBStorage implements IStorage {
     return bet;
   }
 
-  async settleBet(id: number, status: string, actualResult: string, settledBy: number): Promise<Bet> {
+  async settleBet(
+    id: number,
+    status: Bet["status"],
+    actualResult: string,
+    settledBy: number,
+  ): Promise<Bet> {
     // Start transaction for bet settlement
     return db.transaction(async (tx) => {
       // Get the current bet
@@ -2173,7 +2183,7 @@ export class DBStorage implements IStorage {
         newStatus: status,
         settledBy: settledBy,
         reason: `Bet settled with actual result: ${actualResult}`,
-        payout: status === 'won' ? currentBet.potentialPayout : 0,
+        payout: status === 'won' ? currentBet.potentialPayout ?? '0' : '0',
       });
       
       // Update the ledger based on the outcome
@@ -2189,7 +2199,7 @@ export class DBStorage implements IStorage {
           await tx
             .update(betting_ledger)
             .set({
-              amount: currentBet.potentialPayout,
+              amount: currentBet.potentialPayout ?? '0',
               status: 'pending',
               updatedAt: new Date().toISOString(),
             })

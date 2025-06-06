@@ -192,9 +192,9 @@ export default function AdminMatchesPage() {
     if (!player) return false;
     
     // Check all active matches in this round
-    return matches.some(match => {
-      // Skip deleted matches
-      if (match.deleted) return false;
+      return matches.some(match => {
+        // Skip deleted matches
+        if ((match as any).deleted || match.status === 'deleted') return false;
       
       // Split players into arrays
       const aviatorPlayers = match.aviatorPlayers.split(',').map(p => p.trim());
