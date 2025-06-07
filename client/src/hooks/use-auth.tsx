@@ -12,6 +12,7 @@ type User = {
   username: string;
   isAdmin: boolean;
   needsPasswordChange?: boolean;
+  token?: string;
 };
 
 type AuthContextType = {
@@ -45,10 +46,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = Boolean(user);
   const isAdmin = Boolean(user?.isAdmin);
 
+  // Store token in localStorage when user logs in
+  const storeToken = (token: string) => {
+    localStorage.setItem('auth_token', token);
+  };
+
+  // Clear token from localStorage when user logs out
+  const clearToken = () => {
+    localStorage.removeItem('auth_token');
+  };
+
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/login", credentials);
-      return await res.json();
+      const data = await res.json();
+      if (data.token) {
+        storeToken(data.token);
+      }
+      return data;
     },
     onSuccess: (user: User) => {
       queryClient.setQueryData(["/api/user"], { authenticated: true, user });
@@ -71,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/logout");
+      clearToken();
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], { authenticated: false, user: null });

@@ -58,6 +58,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<any | undefined>;
   createUser(data: any): Promise<any>;
   updateUser(id: number, data: Partial<any>): Promise<any | undefined>;
+  getUserByToken(token: string): Promise<any | undefined>;
 
   // Player methods
   getPlayers(): Promise<any[]>;
@@ -276,6 +277,14 @@ export class DBStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return row;
+  }
+
+  async getUserByToken(token: string) {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.token, token));
+    return user;
   }
 
   // Players

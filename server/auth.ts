@@ -14,6 +14,9 @@ import { User as SelectUser } from "@shared/schema";
 declare global {
   namespace Express {
     interface User extends SelectUser {}
+    interface Request {
+      user?: typeof users.$inferSelect;
+    }
   }
 }
 
@@ -70,18 +73,40 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+export async function getUserByToken(token: string) {
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.token, token));
+  return user;
+}
+
 export function isAuthenticated(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated()) {
-    return next();
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
   }
-  res.status(401).json({ error: "Unauthorized" });
+
+  const token = authHeader.split(' ')[1];
+  getUserByToken(token)
+    .then(user => {
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+      req.user = user;
+      next();
+    })
+    .catch(err => {
+      console.error('Error validating token:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    });
 }
 
 export function isAdmin(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated() && req.user.isAdmin) {
-    return next();
+  if (!req.user?.isAdmin) {
+    return res.status(403).json({ error: 'Admin access required' });
   }
-  res.status(403).json({ error: "Forbidden - Admin access required" });
+  next();
 }
 
 export function setupAuth(app: Express) {
@@ -133,83 +158,117 @@ export function setupAuth(app: Express) {
   });
 
   // Auth endpoints
-  app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: Error | null, user: Express.User | false, info: any) => {
-      if (err) {
-        return next(err);
+  app.post("/api/login", async (req: Request, res: Response) => {
+    const { username, passcode } = req.body;
+    if (!username || !passcode) {
+      return res.status(400).json({ error: 'Username and passcode required' });
+    }
+
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.username, username));
+
+      if (!user || user.passcode !== passcode) {
+        return res.status(401).json({ error: 'Invalid credentials' });
       }
-      if (!user) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-      req.login(user, (err) => {
-        if (err) {
-          return next(err);
-        }
-        return res.json({
+
+      // Generate new token
+      const token = randomBytes(32).toString('hex');
+      
+      // Update user with new token
+      await db
+        .update(users)
+        .set({ token })
+        .where(eq(users.id, user.id));
+
+      res.json({
+        user: {
           id: user.id,
           username: user.username,
           isAdmin: user.isAdmin,
           needsPasswordChange: user.needsPasswordChange,
-          playerId: user.playerId
-        });
+          token
+        }
       });
-    })(req, res, next);
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
   
   // Password change endpoint
-  app.post("/api/change-password", isAuthenticated, async (req, res) => {
+  app.post("/api/change-password", isAuthenticated, async (req: Request, res: Response) => {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new password required' });
+    }
+
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
     try {
-      // Validate the request
-      const { newPassword } = req.body;
-      
-      if (!req.user) {
-        return res.status(401).json({ error: "User not authenticated" });
+      if (user.passcode !== currentPassword) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
       }
-      
-      // Validate that new password is a 4-digit PIN
-      if (!/^\d{4}$/.test(newPassword)) {
-        return res.status(400).json({ error: "Password must be exactly 4 digits" });
-      }
-      
-      // Update the user's password
-      const hashedPassword = await hashPassword(newPassword);
-      await db.update(users)
+
+      // Generate new token
+      const token = randomBytes(32).toString('hex');
+
+      // Update user with new password and token
+      await db
+        .update(users)
         .set({ 
-          passcode: hashedPassword,
-          needsPasswordChange: false 
+          passcode: newPassword,
+          token,
+          needsPasswordChange: false
         })
-        .where(eq(users.id, req.user.id))
-        .returning();
-      
-      res.status(200).json({ message: "Password changed successfully" });
+        .where(eq(users.id, user.id));
+
+      res.json({ 
+        success: true,
+        token
+      });
     } catch (error) {
-      console.error("Error changing password:", error);
-      res.status(500).json({ error: "Error changing password" });
+      console.error('Password change error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
-  app.post("/api/logout", (req, res) => {
-    req.logout((err) => {
-      if (err) {
-        return res.status(500).json({ error: "Error during logout" });
-      }
-      res.status(200).json({ message: "Logged out successfully" });
-    });
+  app.post("/api/logout", isAuthenticated, async (req: Request, res: Response) => {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    try {
+      // Clear token
+      await db
+        .update(users)
+        .set({ token: null })
+        .where(eq(users.id, user.id));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
-  app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ authenticated: false });
+  app.get("/api/user", isAuthenticated, (req: Request, res: Response) => {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'User not authenticated' });
     }
+
     res.json({
-      authenticated: true,
-      user: {
-        id: req.user.id,
-        username: req.user.username,
-        isAdmin: req.user.isAdmin,
-        needsPasswordChange: req.user.needsPasswordChange,
-        playerId: req.user.playerId
-      },
+      id: user.id,
+      username: user.username,
+      isAdmin: user.isAdmin,
+      needsPasswordChange: user.needsPasswordChange
     });
   });
 }

@@ -16,7 +16,7 @@ import {
   insertParlaySchema,
   insertLedgerEntrySchema,
 } from "@shared/schema";
-import { setupAuth, isAuthenticated, isAdmin, hashPassword } from "./auth";
+import { setupAuth, isAuthenticated, isAdmin, hashPassword, getUserByToken } from "./auth";
 
 /**
  * Debug helper to log and validate player IDs
@@ -154,43 +154,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     path: "/ws",
   });
 
-  wss.on("connection", (ws, req) => {
-    // Get session from request
-    const session = (req as any).session;
-    
-    if (!session || !session.passport || !session.passport.user) {
-      console.log("WebSocket connection rejected - not authenticated");
-      ws.close(1008, "Authentication required");
+  wss.on("connection", async (ws, req) => {
+    // Get token from URL query parameters
+    const url = new URL(req.url!, `http://${req.headers.host}`);
+    const token = url.searchParams.get('token');
+
+    if (!token) {
+      ws.close(1008, 'No token provided');
       return;
     }
 
-    console.log("WebSocket client connected");
-
-    // Send an initial connection success message
-    ws.send(
-      JSON.stringify({
-        type: "connection",
-        data: { status: "connected", timestamp: new Date().toISOString() },
-      }),
-    );
-
-    ws.on("message", (message) => {
-      try {
-        // Parse the message (will be used in future for client-to-server communication)
-        const data = JSON.parse(message.toString());
-        console.log("Received message:", data);
-      } catch (error) {
-        console.error("Failed to parse WebSocket message:", error);
+    try {
+      const user = await getUserByToken(token);
+      if (!user) {
+        ws.close(1008, 'Invalid token');
+        return;
       }
-    });
 
-    ws.on("close", () => {
-      console.log("WebSocket client disconnected");
-    });
+      // Send connection success message
+      ws.send(JSON.stringify({
+        type: 'connection-success',
+        user: {
+          id: user.id,
+          username: user.username,
+          isAdmin: user.isAdmin
+        }
+      }));
 
-    ws.on("error", (error) => {
-      console.error("WebSocket error:", error);
-    });
+      // Handle incoming messages
+      ws.on('message', (data) => {
+        try {
+          const message = JSON.parse(data.toString());
+          console.log('Received message:', message);
+
+          // Handle different message types
+          switch (message.type) {
+            case 'ping':
+              ws.send(JSON.stringify({ type: 'pong' }));
+              break;
+            // Add other message type handlers here
+            default:
+              console.warn('Unknown message type:', message.type);
+          }
+        } catch (error) {
+          console.error('Error handling message:', error);
+        }
+      });
+
+      // Handle errors
+      ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+      });
+
+      // Handle disconnection
+      ws.on('close', () => {
+        console.log('Client disconnected');
+      });
+
+    } catch (error) {
+      console.error('Error during WebSocket connection:', error);
+      ws.close(1011, 'Internal server error');
+    }
   });
 
   // Initialize the data

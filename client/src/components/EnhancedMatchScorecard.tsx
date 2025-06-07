@@ -785,6 +785,9 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   
   // Calculate team totals and player totals
   useEffect(() => {
+    // Skip if no scores or holes
+    if (!playerScores.size || !holes.length) return;
+
     // Calculate player totals
     const newPlayerTotals = new Map<string, number>();
     const newPlayerFrontNineTotals = new Map<string, number>();
@@ -829,10 +832,25 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
       }
     });
     
-    setPlayerTotals(newPlayerTotals);
-    setPlayerFrontNineTotals(newPlayerFrontNineTotals);
-    setPlayerBackNineTotals(newPlayerBackNineTotals);
-  }, [playerScores, holes, aviatorPlayersList, producerPlayersList]);
+    // Only update state if values have changed
+    const currentTotals = JSON.stringify(Array.from(newPlayerTotals.entries()));
+    const currentFrontNine = JSON.stringify(Array.from(newPlayerFrontNineTotals.entries()));
+    const currentBackNine = JSON.stringify(Array.from(newPlayerBackNineTotals.entries()));
+    
+    const prevTotals = JSON.stringify(Array.from(playerTotals.entries()));
+    const prevFrontNine = JSON.stringify(Array.from(playerFrontNineTotals.entries()));
+    const prevBackNine = JSON.stringify(Array.from(playerBackNineTotals.entries()));
+    
+    if (currentTotals !== prevTotals) {
+      setPlayerTotals(newPlayerTotals);
+    }
+    if (currentFrontNine !== prevFrontNine) {
+      setPlayerFrontNineTotals(newPlayerFrontNineTotals);
+    }
+    if (currentBackNine !== prevBackNine) {
+      setPlayerBackNineTotals(newPlayerBackNineTotals);
+    }
+  }, [playerScores, holes, aviatorPlayersList, producerPlayersList, playerTotals, playerFrontNineTotals, playerBackNineTotals]);
   
   // Handle handicap edit dialog
   const handleHandicapEdit = (playerId: number, currentHandicap: number) => {

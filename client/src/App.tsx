@@ -17,11 +17,12 @@ import TournamentHistory from "@/pages/TournamentHistory";
 import Sportsbook from "@/pages/Sportsbook";
 import Layout from "@/components/Layout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { AuthProvider } from "@/hooks/use-auth";
-import { useState, useEffect } from "react";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { useState, useEffect, useRef } from "react";
 
 function Router() {
-  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const { user } = useAuth();
+  const wsRef = useRef<WebSocket | null>(null);
 
   // Scroll to top on route change
   useEffect(() => {
@@ -29,123 +30,65 @@ function Router() {
   }, [window.location.pathname]);
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimer: number | null = null;
+    if (!user?.token) return;
 
-    // Function to create and setup the WebSocket connection
-    const setupWebSocket = () => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws?token=${user.token}`;
+    
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    ws.onmessage = (event) => {
       try {
-        // Create WebSocket connection with explicit path and credentials
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        const message = JSON.parse(event.data);
+        console.log('Received message:', message);
 
-        // Close existing connection if any
-        if (ws) {
-          ws.close();
+        switch (message.type) {
+          case 'connection-success':
+            console.log('Connection authenticated:', message.user);
+            break;
+          case 'pong':
+            // Handle pong response
+            break;
+          default:
+            console.warn('Unknown message type:', message.type);
         }
-
-        ws = new WebSocket(wsUrl);
-
-        // Add event listeners with better error handling
-        ws.onopen = () => {
-          console.log("WebSocket connection established");
-          // Clear reconnect timer if connection is successful
-          if (reconnectTimer) {
-            window.clearTimeout(reconnectTimer);
-            reconnectTimer = null;
-          }
-          setSocket(ws);
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-
-            // Handle different message types
-            switch (message.type) {
-              case "score-updated":
-              case "score-created":
-                // Invalidate score queries
-                queryClient.invalidateQueries({
-                  queryKey: [`/api/scores?matchId=${message.data.matchId}`],
-                });
-                break;
-
-              case "match-updated":
-                // Invalidate match queries
-                queryClient.invalidateQueries({
-                  queryKey: [`/api/matches/${message.data.id}`],
-                });
-                queryClient.invalidateQueries({
-                  queryKey: [`/api/matches?roundId=${message.data.roundId}`],
-                });
-                break;
-
-              case "tournament-updated":
-                // Invalidate tournament query
-                queryClient.invalidateQueries({
-                  queryKey: ["/api/tournament"],
-                });
-                break;
-
-              case "auth-error":
-                // Handle authentication errors
-                console.error("WebSocket authentication error:", message.data);
-                // Attempt to re-authenticate
-                queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-                break;
-            }
-          } catch (error) {
-            console.error("Failed to parse WebSocket message:", error);
-          }
-        };
-
-        ws.onerror = (error) => {
-          console.error("WebSocket error:", error);
-          // Don't attempt to reconnect immediately on error
-          // Let the onclose handler handle reconnection
-        };
-
-        ws.onclose = (event) => {
-          console.log(`WebSocket connection closed with code ${event.code}`);
-          setSocket(null);
-
-          // Only attempt to reconnect if the connection was closed unexpectedly
-          // (code 1006) or due to authentication failure (code 1008)
-          if (event.code === 1006 || event.code === 1008) {
-            if (!reconnectTimer) {
-              reconnectTimer = window.setTimeout(() => {
-                console.log("Attempting to reconnect WebSocket...");
-                setupWebSocket();
-              }, 3000);
-            }
-          }
-        };
       } catch (error) {
-        console.error("Failed to setup WebSocket:", error);
-        // Attempt to reconnect after 5 seconds in case of setup error
-        if (!reconnectTimer) {
-          reconnectTimer = window.setTimeout(() => {
-            console.log("Attempting to reconnect WebSocket after error...");
-            setupWebSocket();
-          }, 5000);
-        }
+        console.error('Error handling WebSocket message:', error);
       }
     };
 
-    // Initial setup
-    setupWebSocket();
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
 
-    // Clean up WebSocket connection and timers on unmount
+    ws.onclose = (event) => {
+      console.log('WebSocket closed:', event.code, event.reason);
+      
+      // Attempt to reconnect on specific error codes
+      if (event.code === 1006 || event.code === 1008) {
+        console.log('Attempting to reconnect...');
+        setTimeout(() => {
+          if (wsRef.current === ws) {
+            wsRef.current = null;
+            // The useEffect will trigger a new connection
+          }
+        }, 1000);
+      }
+    };
+
+    // Cleanup function
     return () => {
-      if (ws) {
+      if (wsRef.current === ws) {
         ws.close();
-      }
-      if (reconnectTimer) {
-        window.clearTimeout(reconnectTimer);
+        wsRef.current = null;
       }
     };
-  }, []);
+  }, [user?.token]); // Reconnect when token changes
 
   return (
     <Switch>

@@ -87,6 +87,7 @@ export const users = pgTable(
     needsPasswordChange: boolean("needs_password_change")
       .default(true)
       .notNull(),
+    token: text("token").unique(),
   },
   (table) => {
     return {
