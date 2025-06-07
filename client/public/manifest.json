@@ -1,0 +1,16 @@
+{
+  "name": "RC Scoreboard",
+  "short_name": "Scoreboard",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "description": "Golf scorecard app for tournaments.",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+} 

@@ -92,6 +92,10 @@ export function setupAuth(app: Express) {
     saveUninitialized: false,
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+      sameSite: 'lax', // Protect against CSRF
+      httpOnly: true, // Prevent JavaScript access to cookies
+      path: '/', // Cookie is valid for all paths
     }
   };
 

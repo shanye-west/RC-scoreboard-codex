@@ -35,7 +35,7 @@ function Router() {
     // Function to create and setup the WebSocket connection
     const setupWebSocket = () => {
       try {
-        // Create WebSocket connection with explicit path
+        // Create WebSocket connection with explicit path and credentials
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${protocol}//${window.location.host}/ws`;
 
@@ -46,6 +46,7 @@ function Router() {
 
         ws = new WebSocket(wsUrl);
 
+        // Add event listeners with better error handling
         ws.onopen = () => {
           console.log("WebSocket connection established");
           // Clear reconnect timer if connection is successful
@@ -86,6 +87,13 @@ function Router() {
                   queryKey: ["/api/tournament"],
                 });
                 break;
+
+              case "auth-error":
+                // Handle authentication errors
+                console.error("WebSocket authentication error:", message.data);
+                // Attempt to re-authenticate
+                queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                break;
             }
           } catch (error) {
             console.error("Failed to parse WebSocket message:", error);
@@ -94,18 +102,23 @@ function Router() {
 
         ws.onerror = (error) => {
           console.error("WebSocket error:", error);
+          // Don't attempt to reconnect immediately on error
+          // Let the onclose handler handle reconnection
         };
 
         ws.onclose = (event) => {
           console.log(`WebSocket connection closed with code ${event.code}`);
           setSocket(null);
 
-          // Attempt to reconnect after 3 seconds
-          if (!reconnectTimer) {
-            reconnectTimer = window.setTimeout(() => {
-              console.log("Attempting to reconnect WebSocket...");
-              setupWebSocket();
-            }, 3000);
+          // Only attempt to reconnect if the connection was closed unexpectedly
+          // (code 1006) or due to authentication failure (code 1008)
+          if (event.code === 1006 || event.code === 1008) {
+            if (!reconnectTimer) {
+              reconnectTimer = window.setTimeout(() => {
+                console.log("Attempting to reconnect WebSocket...");
+                setupWebSocket();
+              }, 3000);
+            }
           }
         };
       } catch (error) {

@@ -154,7 +154,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     path: "/ws",
   });
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws, req) => {
+    // Get session from request
+    const session = (req as any).session;
+    
+    if (!session || !session.passport || !session.passport.user) {
+      console.log("WebSocket connection rejected - not authenticated");
+      ws.close(1008, "Authentication required");
+      return;
+    }
+
     console.log("WebSocket client connected");
 
     // Send an initial connection success message
