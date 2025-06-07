@@ -18,7 +18,148 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
-import "./BestBallScorecard.css";
+
+// Add styles directly in the component
+const styles = {
+  scorecardContainer: {
+    margin: 0,
+    padding: 0,
+    fontFamily: 'var(--font-sans)',
+  },
+  scorecardGrid: {
+    width: '100%',
+    display: 'grid',
+    gridTemplateColumns: '130px 40px repeat(9, minmax(32px, 1fr)) 50px repeat(9, minmax(32px, 1fr)) 50px 50px',
+    gridAutoRows: '36px',
+    border: '1px solid hsl(var(--border))',
+    borderRadius: 'var(--radius)',
+    overflow: 'hidden',
+    backgroundColor: 'hsl(var(--background))',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+  },
+  scorecardCell: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 4px',
+    borderRight: '1px solid hsl(var(--border))',
+    borderBottom: '1px solid hsl(var(--border))',
+    fontSize: '0.9rem',
+  },
+  headerRow: {
+    fontWeight: 600,
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  playerHeader: {
+    fontWeight: 600,
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  handicapHeader: {
+    fontWeight: 600,
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  holeNumber: {
+    fontWeight: 600,
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  totalHeader: {
+    fontWeight: 600,
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  parRow: {
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  handicapRow: {
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  parLabel: {
+    textAlign: 'left',
+    paddingLeft: '10px',
+    fontWeight: 600,
+  },
+  handicapLabel: {
+    textAlign: 'left',
+    paddingLeft: '10px',
+    fontWeight: 600,
+  },
+  parValue: {
+    fontWeight: 500,
+  },
+  handicapValue: {
+    fontWeight: 500,
+  },
+  empty: {
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  teamHeader: {
+    gridColumn: 1,
+    fontWeight: 600,
+    textAlign: 'left',
+    paddingLeft: '10px',
+  },
+  teamHeaderAviators: {
+    backgroundColor: 'var(--aviator-bg)',
+    color: 'var(--aviator-text)',
+  },
+  teamHeaderProducers: {
+    backgroundColor: 'var(--producer-bg)',
+    color: 'var(--producer-text)',
+  },
+  playerName: {
+    textAlign: 'left',
+    paddingLeft: '10px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  playerNameAviator: {
+    color: 'var(--aviator-text)',
+    borderLeft: '4px solid var(--aviator-accent)',
+  },
+  playerNameProducer: {
+    color: 'var(--producer-text)',
+    borderLeft: '4px solid var(--producer-accent)',
+  },
+  playerHandicap: {
+    fontWeight: 500,
+  },
+  scoreInputCell: {
+    position: 'relative',
+    padding: '2px',
+  },
+  scoreInput: {
+    width: '100%',
+    height: '100%',
+    border: 'none',
+    textAlign: 'center',
+    fontSize: '14px',
+    background: 'transparent',
+    outline: 'none',
+  },
+  bestScore: {
+    backgroundColor: 'rgba(var(--success-rgb), 0.1)',
+  },
+  netScore: {
+    position: 'absolute',
+    bottom: '2px',
+    right: '2px',
+    fontSize: '9px',
+    color: 'hsl(var(--muted-foreground))',
+  },
+  handicapDot: {
+    color: 'hsl(var(--destructive))',
+    fontSize: '12px',
+    marginLeft: '1px',
+  },
+  playerTotal: {
+    fontWeight: 600,
+    backgroundColor: 'hsl(var(--muted))',
+  },
+  teamTotal: {
+    fontWeight: 600,
+    backgroundColor: 'hsl(var(--accent))',
+  },
+};
 
 // Player score interface for Best Ball
 interface BestBallPlayerScore {
@@ -819,7 +960,7 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
     .reduce((acc, s) => acc + (s.producerScore || 0), 0);
 
   return (
-    <div className="scorecard-container">
+    <div style={styles.scorecardContainer}>
       <Card>
         <CardHeader className="pb-1">
           <CardTitle>Match Scorecard</CardTitle>
