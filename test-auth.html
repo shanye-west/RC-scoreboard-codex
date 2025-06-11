@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Test</title>
+</head>
+<body>
+    <h1>Authentication Test</h1>
+    <div id="status">Testing...</div>
+    <div id="results"></div>
+    
+    <script>
+        async function testAuthentication() {
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                statusDiv.textContent = 'Testing login...';
+                
+                // Test login
+                const loginResponse = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'superadmin',
+                        passcode: '1111'
+                    })
+                });
+                
+                if (!loginResponse.ok) {
+                    throw new Error(`Login failed: ${loginResponse.status}`);
+                }
+                
+                const loginData = await loginResponse.json();
+                resultsDiv.innerHTML += `<p>✅ Login successful: ${JSON.stringify(loginData, null, 2)}</p>`;
+                
+                // Store token in localStorage (like the frontend does)
+                if (loginData.user?.token) {
+                    localStorage.setItem('auth_token', loginData.user.token);
+                    resultsDiv.innerHTML += `<p>✅ Token stored in localStorage</p>`;
+                }
+                
+                // Test authenticated request
+                statusDiv.textContent = 'Testing authenticated request...';
+                const userResponse = await fetch('/api/user', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${loginData.user.token}`
+                    }
+                });
+                
+                if (!userResponse.ok) {
+                    throw new Error(`User request failed: ${userResponse.status}`);
+                }
+                
+                const userData = await userResponse.json();
+                resultsDiv.innerHTML += `<p>✅ Authenticated request successful: ${JSON.stringify(userData, null, 2)}</p>`;
+                
+                // Test logout
+                statusDiv.textContent = 'Testing logout...';
+                const logoutResponse = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${loginData.user.token}`
+                    }
+                });
+                
+                if (logoutResponse.ok) {
+                    resultsDiv.innerHTML += `<p>✅ Logout successful</p>`;
+                    localStorage.removeItem('auth_token');
+                    resultsDiv.innerHTML += `<p>✅ Token removed from localStorage</p>`;
+                } else {
+                    resultsDiv.innerHTML += `<p>⚠️ Logout returned: ${logoutResponse.status}</p>`;
+                }
+                
+                statusDiv.textContent = 'All tests completed!';
+                statusDiv.style.color = 'green';
+                
+            } catch (error) {
+                statusDiv.textContent = 'Test failed!';
+                statusDiv.style.color = 'red';
+                resultsDiv.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Run test when page loads
+        window.addEventListener('load', testAuthentication);
+    </script>
+</body>
+</html>

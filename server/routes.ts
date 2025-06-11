@@ -1029,7 +1029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // USER MANAGEMENT (Admin only)
-  app.post("/api/admin/users", isAdmin, async (req, res) => {
+  app.post("/api/admin/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const userData = insertUserSchema.parse(req.body);
 
@@ -1058,7 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/users", isAdmin, async (req, res) => {
+  app.get("/api/admin/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const users = await storage.getUsers();
       // Sanitize user data (remove passwords)
@@ -1075,7 +1075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // TOURNAMENT MANAGEMENT (Admin only)
-  app.post("/api/admin/tournament", isAdmin, async (req, res) => {
+  app.post("/api/admin/tournament", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const tournament = await storage.getTournament();
 
@@ -1106,7 +1106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ROUND MANAGEMENT (Admin only)
-  app.post("/api/admin/rounds", isAdmin, async (req, res) => {
+  app.post("/api/admin/rounds", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const roundData = insertRoundSchema.parse(req.body);
       const round = await storage.createRound(roundData);
@@ -1123,7 +1123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/rounds/:id", isAdmin, async (req, res) => {
+  app.put("/api/admin/rounds/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const roundId = parseInt(req.params.id);
       const round = await storage.getRound(roundId);
@@ -1142,7 +1142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // MATCH MANAGEMENT (Admin only)
-  app.post("/api/admin/matches", isAdmin, async (req, res) => {
+  app.post("/api/admin/matches", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const matchData = insertMatchSchema.parse(req.body);
       const match = await storage.createMatch(matchData);
@@ -1159,7 +1159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/matches/:id", isAdmin, async (req, res) => {
+  app.put("/api/admin/matches/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const matchId = parseInt(req.params.id);
       const match = await storage.getMatch(matchId);
@@ -1178,7 +1178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PLAYER MANAGEMENT (Admin only)
-  app.post("/api/admin/players", isAdmin, async (req, res) => {
+  app.post("/api/admin/players", isAuthenticated, isAdmin, async (req, res) => {
     try {
       // Validate with our custom schema
       const playerData = insertPlayerSchema.parse(req.body);
@@ -1199,7 +1199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete all players - Must come BEFORE the specific ID endpoint to avoid route conflicts
-  app.delete("/api/admin/players/all", isAdmin, async (req, res) => {
+  app.delete("/api/admin/players/all", isAuthenticated, isAdmin, async (req, res) => {
     try {
       // Use the storage interface to delete all players
       const result = await storage.deleteAllPlayers();
@@ -1227,7 +1227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Delete specific player by ID - Must come AFTER the "all" endpoint
-  app.delete("/api/admin/players/:id", isAdmin, async (req, res) => {
+  app.delete("/api/admin/players/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const playerId = parseInt(req.params.id);
       
