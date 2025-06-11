@@ -33,7 +33,10 @@ function Router() {
     if (!user?.token) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?token=${user.token}`;
+    // In development, connect to backend on port 3000, otherwise use current host
+    const isDev = import.meta.env.DEV;
+    const host = isDev ? 'localhost:3000' : window.location.host;
+    const wsUrl = `${protocol}//${host}/ws?token=${user.token}`;
     
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

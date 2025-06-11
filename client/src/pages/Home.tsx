@@ -33,6 +33,7 @@ const Home = () => {
     queryKey: ['/api/courses'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/courses');
+      if (!response) throw new Error('No response received');
       return response.json();
     }
   });
@@ -86,11 +87,21 @@ const Home = () => {
   // Fetch tournament data
   const { data: tournament, isLoading: isTournamentLoading } = useQuery<Tournament>({
     queryKey: ['/api/tournament'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/tournament');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    }
   });
 
   // Fetch rounds data
   const { data: rounds, isLoading: isRoundsLoading } = useQuery<Round[]>({
     queryKey: ['/api/rounds'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/rounds');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    }
   });
 
   // Tournament update mutation
@@ -99,6 +110,7 @@ const Home = () => {
       const { aviatorScore, producerScore, ...safeData } = tournamentData;
 
       const res = await apiRequest("PUT", `/api/tournament/${tournament?.id}`, safeData);
+      if (!res) throw new Error('No response received');
       return await res.json();
     },
     onSuccess: () => {
@@ -124,6 +136,7 @@ const Home = () => {
   const addRoundMutation = useMutation({
     mutationFn: async (roundData: any) => {
       const res = await apiRequest("POST", "/api/rounds", roundData);
+      if (!res) throw new Error('No response received');
       return await res.json();
     },
     onSuccess: (data) => {
