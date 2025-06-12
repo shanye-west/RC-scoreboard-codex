@@ -1008,7 +1008,7 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   };
 
 
-  if (isLoading || scoresLoading || individualScoresLoading || existingScoresLoading) {
+  if (scoresLoading || individualScoresLoading || existingScoresLoading) {
     return null; // Or some loading indicator
   }
 
