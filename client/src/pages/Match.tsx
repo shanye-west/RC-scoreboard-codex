@@ -80,6 +80,7 @@ interface ScoreData {
 const Match = ({ id }: { id: number }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user, isAdmin } = useAuth(); // Get user and isAdmin
 
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -98,6 +99,15 @@ const Match = ({ id }: { id: number }) => {
   const [selectedAviatorPlayers, setSelectedAviatorPlayers] = useState<any[]>([]);
   const [selectedProducerPlayers, setSelectedProducerPlayers] = useState<any[]>([]);
 
+  const [aviatorPlayersForScorecard, setAviatorPlayersForScorecard] = useState<Player[]>([]);
+  const [producerPlayersForScorecard, setProducerPlayersForScorecard] = useState<Player[]>([]);
+
+
+  useEffect(() => {
+    console.log("[Match.tsx] Auth User:", user);
+    console.log("[Match.tsx] isAdmin:", isAdmin);
+  }, [user, isAdmin]);
+
   // Check if admin mode is enabled via URL parameter
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -110,7 +120,9 @@ const Match = ({ id }: { id: number }) => {
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/matches/${id}`);
       if (!response) throw new Error('No response received');
-      return response.json();
+      const matchData = await response.json();
+      console.log("[Match.tsx] Fetched match data, locked status:", matchData?.locked);
+      return matchData;
     },
   });
 
@@ -171,12 +183,13 @@ const Match = ({ id }: { id: number }) => {
     enabled: !!id,
   });
 
-  const { isAdmin } = useAuth();
+  const { isAdmin: authIsAdminFromHook } = useAuth(); // Renamed to avoid conflict with local isAdmin
 
   // Update lock status when match data changes
   useEffect(() => {
     if (match) {
       setIsLocked(!!match.locked);
+      console.log("[Match.tsx] Match locked state initialized/updated:", !!match.locked);
     }
   }, [match]);
 
@@ -232,21 +245,29 @@ const Match = ({ id }: { id: number }) => {
   const toggleLockMutation = useMutation({
     mutationFn: async (locked: boolean) => {
       if (!match) return;
+      console.log(`[Match.tsx] Attempting to set lock status to: ${locked} for match ID: ${match.id}`);
       return apiRequest("PUT", `/api/matches/${match.id}`, {
         locked: locked,
       });
     },
-    onSuccess: () => {
-      setIsLocked(!isLocked);
+    onSuccess: (data, variables) => {
+      setIsLocked(!isLocked); // This should be based on the new state `variables` or refetch
       queryClient.invalidateQueries({ queryKey: [`/api/matches/${id}`] });
+      // It's better to set isLocked based on the intended new state `variables`
+      // or rely on the refetched match data to update it via the useEffect.
+      // For now, let's assume `variables` was the boolean `locked` passed to mutate.
+      const newLockedState = variables; // variables is the argument passed to mutateFn, which is `!isLocked`
+      setIsLocked(newLockedState); 
+      console.log("[Match.tsx] toggleLockMutation success, new isLocked state:", newLockedState);
       toast({
-        title: isLocked ? "Match unlocked" : "Match locked",
-        description: isLocked 
-          ? "The match has been unlocked for editing." 
-          : "The match has been locked to prevent further edits.",
+        title: newLockedState ? "Match locked" : "Match unlocked",
+        description: newLockedState
+          ? "The match has been locked to prevent further edits."
+          : "The match has been unlocked for editing.",
       });
     },
     onError: (error) => {
+      console.error("[Match.tsx] Error toggling lock status:", error);
       toast({
         title: "Error updating match lock status",
         description: error.message,
@@ -428,6 +449,25 @@ const Match = ({ id }: { id: number }) => {
     }
   }, [match, participants, players]);
 
+  useEffect(() => {
+    if (participants.length > 0 && players.length > 0) {
+      const aviators = participants
+        .filter((p) => p.team === "aviators")
+        .map((mp) => players.find((player) => player.id === mp.playerId))
+        .filter((p): p is Player => Boolean(p));
+      setAviatorPlayersForScorecard(aviators);
+
+      const producers = participants
+        .filter((p) => p.team === "producers")
+        .map((mp) => players.find((player) => player.id === mp.playerId))
+        .filter((p): p is Player => Boolean(p));
+      setProducerPlayersForScorecard(producers);
+    } else {
+      setAviatorPlayersForScorecard([]);
+      setProducerPlayersForScorecard([]);
+    }
+  }, [participants, players]);
+
   // Handle lock toggle
   const handleToggleLock = () => {
     toggleLockMutation.mutate(!isLocked);
@@ -562,7 +602,7 @@ const Match = ({ id }: { id: number }) => {
                 </div>
               )}
 
-              {isAdmin && (
+              {isAdmin && ( // Use isAdmin from useAuth()
                 <Button
                   variant="outline"
                   size="sm"
@@ -607,6 +647,11 @@ const Match = ({ id }: { id: number }) => {
             onScoreUpdate={handleScoreUpdate}
             locked={isLocked}
             participants={participants}
+            isBestBall={round?.matchType === "Best Ball"} // Pass isBestBall
+            aviatorPlayersList={aviatorPlayersForScorecard} // Pass aviator players
+            producerPlayersList={producerPlayersForScorecard} // Pass producer players
+            matchData={match} // Pass full match data if EnhancedMatchScorecard needs it
+            // canEditScores is not passed, defaults to true in EnhancedMatchScorecard
           />
         </>
       )}

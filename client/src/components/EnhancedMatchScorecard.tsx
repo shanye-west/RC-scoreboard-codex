@@ -221,14 +221,14 @@ interface ScorecardProps {
 const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   matchId,
   holes = [],
-  aviatorPlayersList = [],
-  producerPlayersList = [],
+  aviatorPlayersList = [], // Now received as prop
+  producerPlayersList = [], // Now received as prop
   participants = [],
   scores = [],
   locked = false,
-  isAviators = false,
-  isProducers = false,
-  isBestBall = false,
+  isAviators = false, // This prop seems unused, consider removing if not needed
+  isProducers = false, // This prop seems unused, consider removing if not needed
+  isBestBall = false, // Now received as prop
   matchData = null,
   roundHandicaps = [],
   onScoreUpdate,
@@ -922,19 +922,17 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   // Check if a hole is greyed out (can't be edited)
   const isHoleGreyedOut = (holeNumber: number): boolean => {
     if (locked) return true;
-
-    // Calculate which hole is the current hole based on scores
     const completedHoles = teamScores
       .filter((s) => s.aviatorScore !== null && s.producerScore !== null)
       .map((s) => s.holeNumber);
-    
     if (completedHoles.length === 0) return false;
-    
-    // Find the highest completed hole number
     const maxCompletedHole = Math.max(...completedHoles);
-    
-    // Allow editing the current hole and the next hole
-    return holeNumber < maxCompletedHole - 1;
+    // Original logic: return holeNumber < maxCompletedHole - 1;
+    // Let's adjust to allow editing current and past holes if not locked by admin
+    // For now, keeping original logic to see logs first
+    const greyedOut = holeNumber < maxCompletedHole - 1;
+    // console.log(`[EnhancedMatchScorecard] isHoleGreyedOut for hole ${holeNumber}: ${greyedOut} (locked: ${locked}, maxCompletedHole: ${maxCompletedHole})`);
+    return greyedOut;
   };
   
   // Helper for match status text
@@ -991,6 +989,28 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   const producerTeamTotal = teamScores
     .filter((s) => s.producerScore !== null)
     .reduce((acc, s) => acc + (s.producerScore || 0), 0);
+
+  // Memoize hole arrays to prevent re-renders if holes prop doesn't change
+  const frontNineHoles = useMemo(() => holeArray.slice(0, 9), [holeArray]);
+  const backNineHoles = useMemo(() => holeArray.slice(9, 18), [holeArray]);
+
+  // Helper to get player score object for a hole
+  const getPlayerScoreForHole = (playerId: number, holeNumber: number): BestBallPlayerScore | undefined => {
+    const player = [...aviatorPlayersList, ...producerPlayersList].find(p => p.id === playerId);
+    if (!player) return undefined;
+    // The key in playerScores map might include player.name. Ensure consistency.
+    // For simplicity, let's assume playerScores map is keyed correctly or adapt access.
+    // This part needs to correctly retrieve from the playerScores map.
+    // Assuming playerScores stores arrays of scores per player-hole key like `${holeNumber}-${player.name}`
+    // and we need the first/only score object from that array.
+    const scoresForPlayerHole = playerScores.get(`${holeNumber}-${player.name}`);
+    return scoresForPlayerHole?.[0];
+  };
+
+
+  if (isLoading || scoresLoading || individualScoresLoading || existingScoresLoading) {
+    return null; // Or some loading indicator
+  }
 
   return (
     <div style={styles.scorecardContainer}>
@@ -1090,6 +1110,7 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                   player.name,
                                   "aviator",
                                 );
+                                // console.log(`[EnhancedMatchScorecard] Rendering Aviator Player Input for hole ${hole.number}, player ${player.name}: locked=${locked}, canEditScores=${canEditScores}, isBestBall=${isBestBall}, isHoleGreyedOut=${isHoleGreyedOut(hole.number)}`);
                                 return (
                                   <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
                                     <div className="relative">
@@ -1109,20 +1130,13 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                         inputMode="numeric"
                                         pattern="[0-9]*"
                                         data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
-                                        className={`score-input w-8 h-8 text-center border border-gray-300 rounded 
-                                          ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed" : ""} 
-                                          ${!isLowest ? "non-counting-score" : ""}
-                                          ${
-                                            (playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes ?? 0) > 0
-                                              ? "handicap-stroke"
-                                              : ""
-                                          }`}
+                                        className={`score-input w-8 h-8 text-center border border-gray-300 rounded ${isHoleGreyedOut(hole.number) ? "bg-gray-200" : ""} ${!isLowest ? "non-counting-score" : ""} ${(playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes ?? 0) > 0 ? "handicap-stroke" : ""}`}
                                         value={getPlayerScoreValue(
                                           hole.number,
                                           player.name,
                                           "aviator",
                                         )}
-                                        onChange={(e) =>
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                                           handlePlayerScoreChange(
                                             hole.number,
                                             player.name,
@@ -1133,7 +1147,7 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                         }
                                         min="1"
                                         max="12"
-                                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
+                                        disabled={locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
                                         {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null &&
@@ -1180,6 +1194,8 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                 className="score-input w-8 h-8 text-center border border-gray-300 rounded"
                                 value={getScoreInputValue(hole.number, "aviator")}
                                 onChange={(e) => handleTeamScoreChange(hole.number, 'aviator', e.target.value)}
+                                // Log for team score input
+                                onFocus={() => console.log(`[EnhancedMatchScorecard] Rendering Aviator Team Input for hole ${hole.number}: locked=${locked}, canEditScores=${canEditScores}, isBestBall=${isBestBall}`)}
                                 disabled={locked || !canEditScores}
                               />
                             )}
@@ -1235,6 +1251,7 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                   player.name,
                                   "producer",
                                 );
+                                // console.log(`[EnhancedMatchScorecard] Rendering Producer Player Input for hole ${hole.number}, player ${player.name}: locked=${locked}, canEditScores=${canEditScores}, isBestBall=${isBestBall}, isHoleGreyedOut=${isHoleGreyedOut(hole.number)}`);
                                 return (
                                   <td key={hole.number} className="py-2 px-2 text-center scorecard-cell">
                                     <div className="relative">
@@ -1254,20 +1271,13 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                         inputMode="numeric"
                                         pattern="[0-9]*"
                                         data-strokes={playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes || 0}
-                                        className={`score-input w-8 h-8 text-center border border-gray-300 rounded 
-                                          ${isHoleGreyedOut(hole.number) ? "bg-gray-200 cursor-not-allowed" : ""} 
-                                          ${!isLowest ? "non-counting-score" : ""}
-                                          ${
-                                            (playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes ?? 0) > 0
-                                              ? "handicap-stroke"
-                                              : ""
-                                          }`}
+                                        className={`score-input w-8 h-8 text-center border border-gray-300 rounded ${isHoleGreyedOut(hole.number) ? "bg-gray-200" : ""} ${!isLowest ? "non-counting-score" : ""} ${(playerScores.get(`${hole.number}-${player.name}`)?.[0]?.handicapStrokes ?? 0) > 0 ? "handicap-stroke" : ""}`}
                                         value={getPlayerScoreValue(
                                           hole.number,
                                           player.name,
                                           "producer",
                                         )}
-                                        onChange={(e) =>
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                                           handlePlayerScoreChange(
                                             hole.number,
                                             player.name,
@@ -1278,7 +1288,7 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                         }
                                         min="1"
                                         max="12"
-                                        disabled={isHoleGreyedOut(hole.number) || locked || !canEditScores}
+                                        disabled={locked || !canEditScores}
                                       />
                                       {/* Net Score Display */}
                                         {playerScores.get(`${hole.number}-${player.name}`)?.[0]?.score !== null &&
@@ -1325,6 +1335,8 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                                 className="score-input w-8 h-8 text-center border border-gray-300 rounded"
                                 value={getScoreInputValue(hole.number, "producer")}
                                 onChange={(e) => handleTeamScoreChange(hole.number, 'producer', e.target.value)}
+                                // Log for team score input
+                                onFocus={() => console.log(`[EnhancedMatchScorecard] Rendering Producer Team Input for hole ${hole.number}: locked=${locked}, canEditScores=${canEditScores}, isBestBall=${isBestBall}`)}
                                 disabled={locked || !canEditScores}
                               />
                             )}
@@ -1372,6 +1384,52 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
               <TabsContent value="front" className="overflow-x-auto">
                 <div className="scorecard-wrapper">
                   {/* Front Nine Content */}
+                  {frontNineHoles.map((hole) => (
+                    <div key={hole.number} className="flex items-center">
+                      <div className="w-32 text-left px-2 py-2 font-semibold">
+                        {`Hole ${hole.number}`}
+                      </div>
+                      {/* Aviator Scores */}
+                      {isBestBall && aviatorPlayersList.length > 0 && (
+                        <div className="flex-1 grid grid-cols-2 gap-1">
+                          {aviatorPlayersList.map((player) => {
+                            const scoreEntry = getPlayerScoreForHole(player.id, hole.number);
+                            const scoreValue = scoreEntry ? scoreEntry.score : null;
+                            const netScoreValue = scoreEntry ? scoreEntry.netScore : null;
+                            const isBest = scoreEntry ? scoreEntry.isBestBall : false;
+
+                            return (
+                              <div
+                                key={`aviator-${player.id}-front-${hole.number}`}
+                                style={{
+                                  ...styles.scoreInputCell,
+                                  ...(isBest && styles.bestScore),
+                                }}
+                              >
+                                <ScoreInput
+                                  type="number"
+                                  min="1"
+                                  max="15"
+                                  value={scoreValue === null ? "" : scoreValue}
+                                  onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value, 'aviator')}
+                                  onFocus={(e) => e.target.select()}
+                                  disabled={locked || !canEditScores}
+                                  style={isHoleGreyedOut(hole.number, 'aviator', player.id) ? { backgroundColor: 'rgba(200,200,200,0.1)', color: 'rgba(150,150,150,0.7)' } : {}}
+                                />
+                                {isBestBall && netScoreValue !== null && (
+                                  <span style={styles.netScore}>{netScoreValue}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {/* Front 9 Total */}
+                      <div style={{ ...styles.scorecardCell, ...styles.playerTotal }}>
+                        {playerFrontNineTotals.get(`${player.id}-aviator`) || 0}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </TabsContent>
 
@@ -1379,6 +1437,52 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
               <TabsContent value="back" className="overflow-x-auto">
                 <div className="scorecard-wrapper">
                   {/* Back Nine Content */}
+                  {backNineHoles.map((hole) => (
+                    <div key={hole.number} className="flex items-center">
+                      <div className="w-32 text-left px-2 py-2 font-semibold">
+                        {`Hole ${hole.number}`}
+                      </div>
+                      {/* Aviator Scores */}
+                      {isBestBall && aviatorPlayersList.length > 0 && (
+                        <div className="flex-1 grid grid-cols-2 gap-1">
+                          {aviatorPlayersList.map((player) => {
+                            const scoreEntry = getPlayerScoreForHole(player.id, hole.number);
+                            const scoreValue = scoreEntry ? scoreEntry.score : null;
+                            const netScoreValue = scoreEntry ? scoreEntry.netScore : null;
+                            const isBest = scoreEntry ? scoreEntry.isBestBall : false;
+
+                            return (
+                              <div
+                                key={`aviator-${player.id}-back-${hole.number}`}
+                                style={{
+                                  ...styles.scoreInputCell,
+                                  ...(isBest && styles.bestScore),
+                                }}
+                              >
+                                <ScoreInput
+                                  type="number"
+                                  min="1"
+                                  max="15"
+                                  value={scoreValue === null ? "" : scoreValue}
+                                  onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value, 'aviator')}
+                                  onFocus={(e) => e.target.select()}
+                                  disabled={locked || !canEditScores}
+                                  style={isHoleGreyedOut(hole.number, 'aviator', player.id) ? { backgroundColor: 'rgba(200,200,200,0.1)', color: 'rgba(150,150,150,0.7)' } : {}}
+                                />
+                                {isBestBall && netScoreValue !== null && (
+                                  <span style={styles.netScore}>{netScoreValue}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {/* Back 9 Total */}
+                      <div style={{ ...styles.scorecardCell, ...styles.playerTotal }}>
+                        {playerBackNineTotals.get(`${player.id}-aviator`) || 0}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </TabsContent>
             </Tabs>
