@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import aviatorsLogo from "../assets/aviators-logo.svg";
 import producersLogo from "../assets/producers-logo.svg";
+import { apiRequest } from "@/lib/queryClient"; // Added import
 
 interface MatchHeaderProps {
   id: number;
@@ -45,11 +46,21 @@ const MatchHeader = ({
   // Fetch match participants
   const { data: participants = [] } = useQuery<any[]>({
     queryKey: [`/api/match-players?matchId=${id}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/match-players?matchId=${id}`);
+      if (!response) throw new Error('No response for match participants');
+      return response.json();
+    },
   });
 
   // Fetch all players for reference
   const { data: allPlayers = [] } = useQuery<any[]>({
     queryKey: ["/api/players"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/players');
+      if (!response) throw new Error('No response for players');
+      return response.json();
+    },
   });
 
   // Split participants into teams - now keeping them as array instead of joining with comma

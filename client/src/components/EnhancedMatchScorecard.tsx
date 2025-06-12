@@ -260,18 +260,33 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
   // Load match scores
   const { data: matchScores, isLoading: scoresLoading } = useQuery<HoleScore[]>({
     queryKey: [`/api/scores?matchId=${matchId}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/scores?matchId=${matchId}`);
+      if (!response) throw new Error('No response for match scores');
+      return response.json();
+    },
     enabled: !!matchId,
   });
   
   // Load individual player scores from best ball table if this is a best ball match
   const { data: individualScores, isLoading: individualScoresLoading } = useQuery<BestBallScore[]>({
     queryKey: [`/api/best-ball-scores/${matchId}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/best-ball-scores/${matchId}`);
+      if (!response) throw new Error('No response for best ball scores');
+      return response.json();
+    },
     enabled: !!matchId && isBestBall,
   });
   
   // Load player scores from the player_scores table
   const { data: existingPlayerScores, isLoading: existingScoresLoading } = useQuery<PlayerScore[]>({
     queryKey: [`/api/player-scores?matchId=${matchId}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/player-scores?matchId=${matchId}`);
+      if (!response) throw new Error('No response for player scores');
+      return response.json();
+    },
     enabled: !!matchId,
   });
   
