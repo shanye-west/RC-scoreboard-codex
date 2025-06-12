@@ -150,6 +150,11 @@ const Match = ({ id }: { id: number }) => {
   // Fetch players data for match editing
   const { data: players = [], isLoading: isPlayersLoading } = useQuery<Player[]>({
     queryKey: ["/api/players"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/players');
+      if (!response) throw new Error('No response received for players');
+      return response.json();
+    },
   });
 
   // Fetch match participants to populate selected players
@@ -158,6 +163,11 @@ const Match = ({ id }: { id: number }) => {
     isLoading: isParticipantsLoading,
   } = useQuery<MatchPlayer[]>({
     queryKey: [`/api/match-players?matchId=${id}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/match-players?matchId=${id}`);
+      if (!response) throw new Error('No response received for match participants');
+      return response.json();
+    },
     enabled: !!id,
   });
 
@@ -521,7 +531,7 @@ const Match = ({ id }: { id: number }) => {
     }
   };
 
-  const handleBackToAdminMatches = () => {
+  const handleNavigateBack = () => {
     if (match && match.roundId) {
       window.location.href = `/rounds/${match.roundId}`;
     } else {

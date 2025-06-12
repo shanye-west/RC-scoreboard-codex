@@ -42,10 +42,5 @@ export default defineConfig({
         ws: true,
       }
     },
-    hmr: {
-      host: 'localhost',
-      port: 3000,
-      clientPort: 3000,
-    },
   },
 });
