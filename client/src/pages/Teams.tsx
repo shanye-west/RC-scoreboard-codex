@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 import aviatorsText from "@/assets/aviators-text.svg";
 import producersText from "@/assets/producers-text.svg";
 
@@ -27,11 +28,21 @@ const Teams = () => {
   // Fetch teams data
   const { data: teams, isLoading: isTeamsLoading } = useQuery<Team[]>({
     queryKey: ['/api/teams'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/teams');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
   });
 
   // Fetch players data
   const { data: players, isLoading: isPlayersLoading } = useQuery<Player[]>({
     queryKey: ['/api/players'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/players');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
   });
 
   const isLoading = isTeamsLoading || isPlayersLoading;

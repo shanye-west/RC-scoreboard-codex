@@ -52,11 +52,21 @@ const AdminPlayersPage = () => {
   // Fetch teams data
   const { data: teams, isLoading: isTeamsLoading } = useQuery<Team[]>({
     queryKey: ['/api/teams'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/teams');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
   });
 
   // Fetch players data
   const { data: players, isLoading: isPlayersLoading } = useQuery<Player[]>({
     queryKey: ['/api/players'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/players');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
   });
 
   const isLoading = isTeamsLoading || isPlayersLoading;
@@ -65,6 +75,7 @@ const AdminPlayersPage = () => {
   const addPlayerMutation = useMutation({
     mutationFn: async (playerData: any) => {
       const res = await apiRequest("POST", "/api/players", playerData);
+      if (!res) throw new Error('No response received');
       return await res.json();
     },
     onSuccess: () => {
@@ -91,6 +102,7 @@ const AdminPlayersPage = () => {
   const deletePlayerMutation = useMutation({
     mutationFn: async (playerId: number) => {
       const res = await apiRequest("DELETE", `/api/players/${playerId}`, {});
+      if (!res) throw new Error('No response received');
       return res;
     },
     onSuccess: () => {
@@ -119,6 +131,7 @@ const AdminPlayersPage = () => {
   const updatePlayerMutation = useMutation({
     mutationFn: async (data: { id: number; playerData: any }) => {
       const res = await apiRequest("PATCH", `/api/players/${data.id}`, data.playerData);
+      if (!res) throw new Error('No response received');
       return await res.json();
     },
     onSuccess: () => {

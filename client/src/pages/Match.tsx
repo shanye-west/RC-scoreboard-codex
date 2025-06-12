@@ -107,16 +107,31 @@ const Match = ({ id }: { id: number }) => {
   // Fetch match data
   const { data: match, isLoading: isMatchLoading } = useQuery<MatchData>({
     queryKey: [`/api/matches/${id}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/matches/${id}`);
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
   });
 
   // Fetch scores for this match
   const { data: scores, isLoading: isScoresLoading } = useQuery<ScoreData[]>({
     queryKey: [`/api/scores?matchId=${id}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/scores?matchId=${id}`);
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
   });
 
   // Fetch round data
   const { data: round, isLoading: isRoundLoading } = useQuery<RoundData>({
     queryKey: [`/api/rounds/${match?.roundId}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/rounds/${match?.roundId}`);
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
     enabled: !!match?.roundId,
   });
 

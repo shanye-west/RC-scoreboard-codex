@@ -69,23 +69,43 @@ const Round = ({ id }: RoundProps) => {
   // Fetch players for match creation
   const { data: players = [], isLoading: isPlayersLoading } = useQuery<Player[]>({
     queryKey: ['/api/players'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/players');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
     enabled: isAdmin && isCreateMatchDialogOpen,
   });
   
   // Fetch round data
   const { data: round, isLoading: isRoundLoading } = useQuery<RoundData>({
     queryKey: [`/api/rounds/${id}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/rounds/${id}`);
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
   });
 
   // Fetch match participants for this round
   const { data: roundParticipants = [], isLoading: isParticipantsLoading } = useQuery<any[]>({
     queryKey: [`/api/match-players?roundId=${id}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/match-players?roundId=${id}`);
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
     enabled: isAdmin && isCreateMatchDialogOpen,
   });
 
   // Fetch matches for this round
   const { data: matches = [], isLoading: isMatchesLoading } = useQuery<Match[]>({
     queryKey: [`/api/matches?roundId=${id}`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/matches?roundId=${id}`);
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
   });
   
   // Create match mutation
@@ -100,6 +120,7 @@ const Round = ({ id }: RoundProps) => {
       };
       
       const matchRes = await apiRequest("POST", `/api/matches`, matchPayload);
+      if (!matchRes) throw new Error('No response received');
       const newMatch = await matchRes.json();
       
       // Then add all the aviator players

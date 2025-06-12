@@ -67,6 +67,11 @@ export default function Sportsbook() {
     error: betTypesError,
   } = useQuery<BetType[]>({
     queryKey: ["/api/bet-types"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/bet-types');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
     enabled: true,
   });
 
@@ -78,6 +83,11 @@ export default function Sportsbook() {
     refetch: refetchUserBets,
   } = useQuery<Bet[]>({
     queryKey: ["/api/bets/user"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/bets/user');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
     enabled: isAuthenticated,
   });
 
@@ -88,6 +98,11 @@ export default function Sportsbook() {
     error: matchesError,
   } = useQuery<Match[]>({
     queryKey: ["/api/matches"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/matches');
+      if (!response) throw new Error('No response received');
+      return response.json();
+    },
     enabled: true,
   });
 
@@ -173,6 +188,7 @@ export default function Sportsbook() {
 
       // Send API request to create bet
       const response = await apiRequest("POST", "/api/bets", payload);
+      if (!response) throw new Error('No response received');
       const result = await response.json();
 
       if (response.ok) {
