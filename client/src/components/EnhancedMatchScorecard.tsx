@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import "./BestBallScorecard.css";
 
 // Add styles directly in the component
 const styles = {
