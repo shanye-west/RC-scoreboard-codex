@@ -1381,109 +1381,21 @@ const EnhancedMatchScorecard: React.FC<ScorecardProps> = ({
                 </div>
               </TabsContent>
 
-              {/* Front Nine Tab Content - Similar to All but filtered */}
+              {/* Front Nine Tab Content */}
               <TabsContent value="front" className="overflow-x-auto">
                 <div className="scorecard-wrapper">
-                  {/* Front Nine Content */}
-                  {frontNineHoles.map((hole) => (
-                    <div key={hole.number} className="flex items-center">
-                      <div className="w-32 text-left px-2 py-2 font-semibold">
-                        {`Hole ${hole.number}`}
-                      </div>
-                      {/* Aviator Scores */}
-                      {isBestBall && aviatorPlayersList.length > 0 && (
-                        <div className="flex-1 grid grid-cols-2 gap-1">
-                          {aviatorPlayersList.map((player) => {
-                            const scoreEntry = getPlayerScoreForHole(player.id, hole.number);
-                            const scoreValue = scoreEntry ? scoreEntry.score : null;
-                            const netScoreValue = scoreEntry ? scoreEntry.netScore : null;
-                            const isBest = scoreEntry ? scoreEntry.isBestBall : false;
-
-                            return (
-                              <div
-                                key={`aviator-${player.id}-front-${hole.number}`}
-                                style={{
-                                  ...styles.scoreInputCell,
-                                  ...(isBest && styles.bestScore),
-                                }}
-                              >
-                                <ScoreInput
-                                  type="number"
-                                  min="1"
-                                  max="15"
-                                  value={scoreValue === null ? "" : scoreValue}
-                                  onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value, 'aviator')}
-                                  onFocus={(e) => e.target.select()}
-                                  disabled={locked || !canEditScores}
-                                  style={isHoleGreyedOut(hole.number, 'aviator', player.id) ? { backgroundColor: 'rgba(200,200,200,0.1)', color: 'rgba(150,150,150,0.7)' } : {}}
-                                />
-                                {isBestBall && netScoreValue !== null && (
-                                  <span style={styles.netScore}>{netScoreValue}</span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {/* Front 9 Total */}
-                      <div style={{ ...styles.scorecardCell, ...styles.playerTotal }}>
-                        {playerFrontNineTotals.get(`${player.id}-aviator`) || 0}
-                      </div>
-                    </div>
-                  ))}
+                  <div className="text-center py-8 text-gray-500">
+                    Front 9 view coming soon. Use "All Holes" tab for now.
+                  </div>
                 </div>
               </TabsContent>
 
-              {/* Back Nine Tab Content - Similar to All but filtered */}
+              {/* Back Nine Tab Content */}
               <TabsContent value="back" className="overflow-x-auto">
                 <div className="scorecard-wrapper">
-                  {/* Back Nine Content */}
-                  {backNineHoles.map((hole) => (
-                    <div key={hole.number} className="flex items-center">
-                      <div className="w-32 text-left px-2 py-2 font-semibold">
-                        {`Hole ${hole.number}`}
-                      </div>
-                      {/* Aviator Scores */}
-                      {isBestBall && aviatorPlayersList.length > 0 && (
-                        <div className="flex-1 grid grid-cols-2 gap-1">
-                          {aviatorPlayersList.map((player) => {
-                            const scoreEntry = getPlayerScoreForHole(player.id, hole.number);
-                            const scoreValue = scoreEntry ? scoreEntry.score : null;
-                            const netScoreValue = scoreEntry ? scoreEntry.netScore : null;
-                            const isBest = scoreEntry ? scoreEntry.isBestBall : false;
-
-                            return (
-                              <div
-                                key={`aviator-${player.id}-back-${hole.number}`}
-                                style={{
-                                  ...styles.scoreInputCell,
-                                  ...(isBest && styles.bestScore),
-                                }}
-                              >
-                                <ScoreInput
-                                  type="number"
-                                  min="1"
-                                  max="15"
-                                  value={scoreValue === null ? "" : scoreValue}
-                                  onChange={(e) => handleScoreChange(hole.number, player.id, e.target.value, 'aviator')}
-                                  onFocus={(e) => e.target.select()}
-                                  disabled={locked || !canEditScores}
-                                  style={isHoleGreyedOut(hole.number, 'aviator', player.id) ? { backgroundColor: 'rgba(200,200,200,0.1)', color: 'rgba(150,150,150,0.7)' } : {}}
-                                />
-                                {isBestBall && netScoreValue !== null && (
-                                  <span style={styles.netScore}>{netScoreValue}</span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {/* Back 9 Total */}
-                      <div style={{ ...styles.scorecardCell, ...styles.playerTotal }}>
-                        {playerBackNineTotals.get(`${player.id}-aviator`) || 0}
-                      </div>
-                    </div>
-                  ))}
+                  <div className="text-center py-8 text-gray-500">
+                    Back 9 view coming soon. Use "All Holes" tab for now.
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
