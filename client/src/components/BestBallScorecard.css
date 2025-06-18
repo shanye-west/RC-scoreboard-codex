@@ -1,0 +1,174 @@
+/* Best Ball Scorecard Styles */
+
+.scorecard-container {
+  width: 100%;
+  overflow-x: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.scorecard-wrapper {
+  min-width: 800px;
+  overflow-x: auto;
+}
+
+.scorecard-cell {
+  position: relative;
+  padding: 4px;
+  border: 1px solid #e0e0e0;
+  text-align: center;
+  background: white;
+}
+
+.score-input {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 14px;
+  padding: 0;
+  outline: none;
+  background: white;
+}
+
+.score-input:focus {
+  border-color: #007acc;
+  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+}
+
+.score-input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  color: #999;
+}
+
+.score-display {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sticky-column {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: inherit;
+  border-right: 2px solid #ddd;
+  min-width: 120px;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.handicap-strokes {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  display: flex;
+  gap: 2px;
+  z-index: 5;
+}
+
+.handicap-indicator {
+  width: 4px;
+  height: 4px;
+  background-color: #dc2626;
+  border-radius: 50%;
+}
+
+.net-score {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-size: 10px;
+  color: #666;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.non-counting-score {
+  background-color: #f9f9f9 !important;
+  color: #999;
+}
+
+.handicap-stroke {
+  background-color: #fef3c7 !important;
+}
+
+/* Team colors */
+.bg-aviator {
+  background-color: #2563eb;
+  color: white;
+}
+
+.bg-producer {
+  background-color: #dc2626;
+  color: white;
+}
+
+.text-aviator {
+  color: #2563eb;
+}
+
+.text-producer {
+  color: #dc2626;
+}
+
+/* Match status colors */
+.text-gray-400 {
+  color: #9ca3af;
+}
+
+.text-black {
+  color: #000;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .scorecard-wrapper {
+    min-width: 600px;
+  }
+  
+  .sticky-column {
+    min-width: 100px;
+    max-width: 100px;
+    font-size: 12px;
+  }
+  
+  .score-input {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  
+  .score-display {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .scorecard-container {
+    overflow: visible;
+  }
+  
+  .scorecard-wrapper {
+    min-width: auto;
+    overflow: visible;
+  }
+  
+  .sticky-column {
+    position: static;
+  }
+}
